@@ -81,3 +81,9 @@ configures CMake in a temporary directory and removes the directory after the
 scan. It passes compiler arguments to libclang without invoking the commands.
 The JSON preserves Tree-sitter and CMake facts and adds semantic edges,
 translation-unit target triples, coverage and diagnostic or skip details.
+
+C++ call sites have a project-scoped `callSiteId`. With semantic resolution,
+`semanticEdgeIds` links a site to its observed libclang edges. Those edges retain
+their translation unit and source evidence and include `callerSymbolId` and
+`targetSymbolId` when they can be matched to the static symbols. Compiler-only
+edges remain in the semantic list even when no syntactic call site matches.

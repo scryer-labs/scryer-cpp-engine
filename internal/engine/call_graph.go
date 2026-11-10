@@ -23,26 +23,32 @@ func location(file string, node *sitter.Node) sourceRange {
 }
 
 type functionSymbol struct {
-	ID         string      `json:"symbolId"`
+	ID         string `json:"symbolId"`
+	baseName   string
 	Name       string      `json:"name,omitempty"`
 	Kind       string      `json:"kind"`
 	Definition sourceRange `json:"definition"`
 }
 
 type callSite struct {
-	CallerID    string      `json:"callerSymbolId,omitempty"`
-	Callee      string      `json:"callee"`
-	CandidateID string      `json:"candidateSymbolId,omitempty"`
-	Resolution  string      `json:"resolution"`
-	Site        sourceRange `json:"site"`
+	ID              string   `json:"callSiteId"`
+	SemanticEdgeIDs []string `json:"semanticEdgeIds,omitempty"`
+	name            string
+	nameRange       sourceRange
+	calleeRange     sourceRange
+	CallerID        string      `json:"callerSymbolId,omitempty"`
+	Callee          string      `json:"callee"`
+	CandidateID     string      `json:"candidateSymbolId,omitempty"`
+	Resolution      string      `json:"resolution"`
+	Site            sourceRange `json:"site"`
 }
 
 type callGraph struct {
-	Semantic  *semanticFacts   `json:"semantic,omitempty"`
-	ProjectID string           `json:"projectId"`
-	Basis     string           `json:"basis"`
-	Symbols   []functionSymbol `json:"symbols"`
-	Calls     []callSite       `json:"calls"`
+	Semantic  *semanticCallFacts `json:"semantic,omitempty"`
+	ProjectID string             `json:"projectId"`
+	Basis     string             `json:"basis"`
+	Symbols   []functionSymbol   `json:"symbols"`
+	Calls     []callSite         `json:"calls"`
 }
 
 type functionScope struct {
@@ -64,14 +70,27 @@ func (g *callGraph) collect(node *sitter.Node, file string, source []byte, scope
 		if node.Kind() == "lambda_expression" {
 			symbol.Kind = "lambda"
 		} else {
-			symbol.Name = functionName(node.ChildByFieldName("declarator"), source)
+			if name := functionName(node.ChildByFieldName("declarator")); name != nil {
+				symbol.Name = name.Utf8Text(source)
+				if leaf := terminalName(name); leaf != nil {
+					symbol.baseName = leaf.Utf8Text(source)
+				}
+			}
 		}
 		g.Symbols = append(g.Symbols, symbol)
 		scopes = append(scopes, functionScope{id: symbol.ID, end: node.EndByte()})
 	case "call_expression":
 		callee := node.ChildByFieldName("function")
 		if callee != nil {
-			call := callSite{Callee: callee.Utf8Text(source), Site: location(file, node), Resolution: "unresolved"}
+			call := callSite{
+				ID:     file + ":" + strconv.FormatUint(uint64(node.StartByte()), 10) + "-" + strconv.FormatUint(uint64(node.EndByte()), 10),
+				Callee: callee.Utf8Text(source), Site: location(file, node), Resolution: "unresolved",
+				calleeRange: location(file, callee),
+			}
+			if name := terminalName(callee); name != nil {
+				call.name = name.Utf8Text(source)
+				call.nameRange = location(file, name)
+			}
 			if len(scopes) > 0 {
 				call.CallerID = scopes[len(scopes)-1].id
 			}
@@ -81,18 +100,36 @@ func (g *callGraph) collect(node *sitter.Node, file string, source []byte, scope
 	return scopes
 }
 
-func functionName(node *sitter.Node, source []byte) string {
+func functionName(node *sitter.Node) *sitter.Node {
 	for node != nil {
 		switch node.Kind() {
 		case "identifier", "field_identifier", "qualified_identifier", "destructor_name", "operator_name", "operator_cast":
-			return node.Utf8Text(source)
+			return node
 		case "reference_declarator", "parenthesized_declarator":
 			node = node.NamedChild(0)
 		default:
 			node = node.ChildByFieldName("declarator")
 		}
 	}
-	return ""
+	return nil
+}
+
+func terminalName(node *sitter.Node) *sitter.Node {
+	for node != nil {
+		switch node.Kind() {
+		case "identifier", "field_identifier", "destructor_name", "operator_name", "operator_cast":
+			return node
+		case "qualified_identifier", "template_function", "template_method":
+			node = node.ChildByFieldName("name")
+		case "field_expression":
+			node = node.ChildByFieldName("field")
+		case "parenthesized_expression":
+			node = node.NamedChild(0)
+		default:
+			return nil
+		}
+	}
+	return nil
 }
 
 // A unique spelling is a navigation hint, not proof of C++ name lookup.

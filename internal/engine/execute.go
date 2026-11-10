@@ -122,7 +122,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		}
 		if callsRequested {
 			if sources.resolution != nil {
-				sources.graph.Semantic = &semanticFacts{Resolution: sources.resolution, Edges: sources.resolution.Calls}
+				sources.graph.joinSemantic(sources.resolution)
 			}
 			facts["call-graph"] = sources.graph
 		}
