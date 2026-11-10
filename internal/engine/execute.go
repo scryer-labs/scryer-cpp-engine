@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/cmake"
 )
@@ -64,8 +65,12 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	if r.Operation != "scan" {
 		return nil, &protocolError{"UNSUPPORTED_OPERATION", "C++ engine does not support operation " + r.Operation}
 	}
-	for _, fact := range r.Scan.Facts {
-		if fact != "dependencies" {
+	selected := r.Scan.Facts
+	if len(selected) == 0 {
+		selected = []string{"dependencies"}
+	}
+	for _, fact := range selected {
+		if fact != "dependencies" && fact != "architecture" {
 			return nil, &protocolError{"UNSUPPORTED_FACT", "C++ engine does not support " + fact}
 		}
 	}
@@ -76,15 +81,20 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	if info, err := os.Stat(root); err != nil || !info.IsDir() {
 		return nil, &protocolError{"INVALID_REQUEST", "scan repository must be an existing directory"}
 	}
-	includes, err := ScanIncludes(ctx, root)
-	if err != nil {
-		return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
-	}
 	buildFacts, err := cmake.Scan(ctx, root)
 	if err != nil {
 		return nil, &protocolError{"CMAKE_SCAN_ERROR", err.Error()}
 	}
-	return &report{1, root, map[string]any{
-		"dependencies": map[string]any{"includes": includes, "cmake": buildFacts},
-	}}, nil
+	facts := make(map[string]any, len(selected))
+	if slices.Contains(selected, "architecture") {
+		facts["architecture"] = describeArchitecture(root, buildFacts)
+	}
+	if slices.Contains(selected, "dependencies") {
+		includes, err := ScanIncludes(ctx, root)
+		if err != nil {
+			return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
+		}
+		facts["dependencies"] = map[string]any{"includes": includes, "cmake": buildFacts}
+	}
+	return &report{1, root, facts}, nil
 }

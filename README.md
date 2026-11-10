@@ -35,3 +35,8 @@ dependencies. Link operands can name targets, libraries, paths or flags.
 Include targets and link operands remain as written, and the scanner does not
 connect the two datasets. Declarations may appear in inactive branches or in
 files that a particular build does not load.
+
+`architecture` returns the components and link declarations visible in CMake,
+with source locations and project-scoped component IDs. Link endpoints list
+matching declared component IDs when available. Multiple candidates remain
+visible. Conditional or unresolved CMake inputs remain declarations.
