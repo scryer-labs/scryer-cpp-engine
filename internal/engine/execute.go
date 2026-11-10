@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/scryer-labs/scryer-cpp-engine/internal/cmake"
 )
 
 const (
@@ -78,7 +80,11 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	if err != nil {
 		return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
 	}
+	buildFacts, err := cmake.Scan(ctx, root)
+	if err != nil {
+		return nil, &protocolError{"CMAKE_SCAN_ERROR", err.Error()}
+	}
 	return &report{1, root, map[string]any{
-		"dependencies": map[string]any{"includes": includes},
+		"dependencies": map[string]any{"includes": includes, "cmake": buildFacts},
 	}}, nil
 }

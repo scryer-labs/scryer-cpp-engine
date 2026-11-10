@@ -19,7 +19,19 @@ compiler on the user's machine nor a build of the target project.
 
 ## Facts
 
-The `dependencies` fact returns source-level include directives under
-`includes`, with a repository-relative file, a one-based line number and the
-literal include target. Directives in conditional branches may be present.
-Targets are unresolved, and this scan does not collect a CMake target graph.
+The `dependencies` fact contains two independent collections:
+
+- `includes` records C and C++ include directives with a repository-relative
+  file, one-based line number and literal include target.
+- `cmake` records library and executable targets, aliases, link declarations,
+  external dependency declarations and subdirectories from `CMakeLists.txt`
+  and `*.cmake` files. Each record includes its file and line. Conditional
+  declarations carry their textual control-flow context. Dynamic names, link
+  items and other supported arguments that require evaluation are recorded in
+  `unresolved`.
+
+The scan reads declarations without configuring a CMake build or fetching
+dependencies. Link operands can name targets, libraries, paths or flags.
+Include targets and link operands remain as written, and the scanner does not
+connect the two datasets. Declarations may appear in inactive branches or in
+files that a particular build does not load.
