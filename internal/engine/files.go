@@ -3,7 +3,6 @@ package engine
 import (
 	"path"
 	"slices"
-	"strings"
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/cmake"
 )
@@ -21,9 +20,15 @@ type sourceFile struct {
 
 type fileReference struct {
 	Include
-	Column     uint   `json:"column"`
-	To         string `json:"to,omitempty"`
-	Resolution string `json:"resolution"`
+	Column     uint               `json:"column"`
+	To         string             `json:"to,omitempty"`
+	Resolution string             `json:"resolution"`
+	Candidates []includeCandidate `json:"candidates,omitempty"`
+}
+
+type includeCandidate struct {
+	Path        string        `json:"path"`
+	SearchPaths []includePath `json:"searchPaths"`
 }
 
 type filesReport struct {
@@ -54,17 +59,62 @@ func describeFiles(root string, build cmake.Facts, source sourceFacts) filesRepo
 			entry.Memberships = append(entry.Memberships, membership{Location: source.Location, ComponentID: id})
 		}
 	}
+	search := indexIncludePaths(root, build)
 	for _, include := range source.includes {
-		ref := fileReference{Include: include, Column: include.Column, Resolution: "unresolved"}
-		if name, ok := strings.CutPrefix(include.Target, "\""); ok {
-			if name, ok := strings.CutSuffix(name, "\""); ok && !path.IsAbs(name) {
-				candidate := path.Join(path.Dir(include.File), name)
-				if _, exists := byPath[candidate]; exists {
-					ref.To, ref.Resolution = candidate, "relative-path"
-				}
-			}
-		}
+		ref := resolveInclude(include, result.Files[byPath[include.File]].ComponentIDs, byPath, search)
 		result.References = append(result.References, ref)
 	}
 	return result
+}
+
+func resolveInclude(include Include, componentIDs []string, byPath map[string]int, search *includePaths) fileReference {
+	ref := fileReference{Include: include, Column: include.Column, Resolution: "unresolved"}
+	raw := include.Target
+	if len(raw) < 3 {
+		return ref
+	}
+	quoted := raw[0] == '"' && raw[len(raw)-1] == '"'
+	angled := raw[0] == '<' && raw[len(raw)-1] == '>'
+	name := raw[1 : len(raw)-1]
+	if (!quoted && !angled) || path.IsAbs(name) {
+		return ref
+	}
+	if quoted {
+		candidate := path.Join(path.Dir(include.File), name)
+		if _, exists := byPath[candidate]; exists {
+			ref.To, ref.Resolution = candidate, "relative-path"
+			return ref
+		}
+	}
+
+	candidateIndex := map[string]int{}
+	for _, id := range componentIDs {
+		for _, dir := range search.forComponent(id) {
+			candidate := path.Join(dir.Directory, name)
+			if _, exists := byPath[candidate]; !exists {
+				continue
+			}
+			i, exists := candidateIndex[candidate]
+			if !exists {
+				i = len(ref.Candidates)
+				candidateIndex[candidate] = i
+				ref.Candidates = append(ref.Candidates, includeCandidate{Path: candidate})
+			}
+			paths := ref.Candidates[i].SearchPaths
+			if !slices.ContainsFunc(paths, func(existing includePath) bool {
+				return existing.Target == dir.Target && existing.File == dir.File && existing.Line == dir.Line && existing.Expression == dir.Expression
+			}) {
+				ref.Candidates[i].SearchPaths = append(paths, dir)
+			}
+		}
+	}
+	switch len(ref.Candidates) {
+	case 1:
+		ref.To, ref.Resolution = ref.Candidates[0].Path, "cmake-include-path"
+	default:
+		if len(ref.Candidates) > 1 {
+			ref.Resolution = "ambiguous"
+		}
+	}
+	return ref
 }

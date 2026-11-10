@@ -43,9 +43,14 @@ visible. Conditional or unresolved CMake inputs remain declarations.
 
 `files` returns C/C++ file paths, explicit CMake source memberships and include
 references. Shared files can have multiple component IDs and unassigned files
-have an empty list. Quoted relative includes are linked when the file exists
-next to the including file or at that relative path. Include search paths,
-variables, generated sources and CMake file sets are outside this resolution.
+have an empty list. The scanner first checks quoted paths relative to the source
+file. It also checks source-tree include directories declared for the owning
+target and propagated by the public/interface links of local CMake targets.
+The report preserves the directory declarations behind matches and lists
+multiple candidates without selecting one. It handles literal paths and
+build-interface paths based on `${CMAKE_CURRENT_SOURCE_DIR}`. Other generator
+expressions, generated sources, CMake file sets and compiler search paths remain
+outside this static resolution.
 
 `call-graph` returns syntactic function definitions, lambdas and call sites with
 project-relative paths and one-based line/byte-column ranges (end exclusive).

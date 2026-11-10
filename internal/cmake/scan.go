@@ -59,7 +59,15 @@ type TargetSource struct {
 	Path   string
 }
 
+type IncludeDirectory struct {
+	Location
+	Target     string `json:"target"`
+	Visibility string `json:"visibility"`
+	Expression string `json:"expression"`
+}
+
 type Facts struct {
+	IncludeDirectories   []IncludeDirectory   `json:"-"`
 	Sources              []TargetSource       `json:"-"`
 	Targets              []Target             `json:"targets"`
 	Links                []Link               `json:"links"`
@@ -146,6 +154,8 @@ func (f *Facts) scanFile(ctx context.Context, file, source string) error {
 			}
 		case "add_library", "add_executable":
 			f.target(location, cmd)
+		case "target_include_directories":
+			f.includeDirectories(location, cmd)
 		case "target_sources":
 			f.targetSources(location, cmd)
 		case "target_link_libraries":
@@ -260,6 +270,29 @@ func (f *Facts) addSources(loc Location, target string, args []argument) {
 		if arg.literal() && filepath.IsLocal(filepath.FromSlash(arg.text)) {
 			loc.Line = arg.line
 			f.Sources = append(f.Sources, TargetSource{Location: loc, Target: target, Path: arg.text})
+		}
+	}
+}
+
+func (f *Facts) includeDirectories(loc Location, cmd invocation) {
+	target, ok := f.first(loc, cmd)
+	if !ok {
+		return
+	}
+	visibility := ""
+	for _, arg := range cmd.args[1:] {
+		switch arg.text {
+		case "PRIVATE", "PUBLIC", "INTERFACE":
+			visibility = arg.text
+		case "SYSTEM", "BEFORE", "AFTER":
+			continue
+		default:
+			if visibility != "" {
+				loc.Line = arg.line
+				f.IncludeDirectories = append(f.IncludeDirectories, IncludeDirectory{
+					Location: loc, Target: target, Visibility: visibility, Expression: arg.text,
+				})
+			}
 		}
 	}
 }
