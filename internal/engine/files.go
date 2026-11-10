@@ -13,9 +13,10 @@ type membership struct {
 }
 
 type sourceFile struct {
-	Path         string       `json:"path"`
-	ComponentIDs []string     `json:"componentIds"`
-	Memberships  []membership `json:"memberships,omitempty"`
+	Path               string       `json:"path"`
+	ComponentIDs       []string     `json:"componentIds"`
+	SearchComponentIDs []string     `json:"searchComponentIds,omitempty"`
+	Memberships        []membership `json:"memberships,omitempty"`
 }
 
 type fileReference struct {
@@ -60,11 +61,49 @@ func describeFiles(root string, build cmake.Facts, source sourceFacts) filesRepo
 		}
 	}
 	search := indexIncludePaths(root, build)
+	propagateIncludeContexts(result.Files, source.includes, byPath, search)
 	for _, include := range source.includes {
-		ref := resolveInclude(include, result.Files[byPath[include.File]].ComponentIDs, byPath, search)
+		ref := resolveInclude(include, result.Files[byPath[include.File]].SearchComponentIDs, byPath, search)
 		result.References = append(result.References, ref)
 	}
 	return result
+}
+
+// Each reachable file is visited once per compilation target. The context
+// describes how it was reached, without adding a CMake membership.
+func propagateIncludeContexts(files []sourceFile, includes []Include, byPath map[string]int, search *includePaths) {
+	byFile := make(map[string][]int)
+	for i, include := range includes {
+		byFile[include.File] = append(byFile[include.File], i)
+	}
+	type visit struct {
+		file        int
+		componentID string
+	}
+	var pending []visit
+	seen := map[visit]bool{}
+	enqueue := func(file int, componentID string) {
+		item := visit{file: file, componentID: componentID}
+		if !seen[item] {
+			seen[item] = true
+			files[file].SearchComponentIDs = append(files[file].SearchComponentIDs, componentID)
+			pending = append(pending, item)
+		}
+	}
+	for i, file := range files {
+		for _, id := range file.ComponentIDs {
+			enqueue(i, id)
+		}
+	}
+	for head := 0; head < len(pending); head++ {
+		item := pending[head]
+		for _, i := range byFile[files[item.file].Path] {
+			ref := resolveInclude(includes[i], []string{item.componentID}, byPath, search)
+			if ref.To != "" {
+				enqueue(byPath[ref.To], item.componentID)
+			}
+		}
+	}
 }
 
 func resolveInclude(include Include, componentIDs []string, byPath map[string]int, search *includePaths) fileReference {

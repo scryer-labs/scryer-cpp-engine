@@ -46,6 +46,9 @@ references. Shared files can have multiple component IDs and unassigned files
 have an empty list. The scanner first checks quoted paths relative to the source
 file. It also checks source-tree include directories declared for the owning
 target and propagated by the public/interface links of local CMake targets.
+When an include can be matched in a target context, the scanner follows that
+context through the included file. `searchComponentIds` identifies these
+contexts, while `componentIds` records declared source membership.
 The report preserves the directory declarations behind matches and lists
 multiple candidates without selecting one. It handles literal paths and
 build-interface paths based on `${CMAKE_CURRENT_SOURCE_DIR}`. Other generator
