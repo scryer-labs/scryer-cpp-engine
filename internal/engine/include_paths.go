@@ -55,9 +55,14 @@ func sourceIncludePath(root string, declaration cmake.IncludeDirectory) (string,
 		value = strings.TrimSuffix(strings.TrimPrefix(value, "$<BUILD_INTERFACE:"), ">")
 	}
 	sourceDir := filepath.Join(root, filepath.FromSlash(path.Dir(declaration.File)))
-	const variable = "${CMAKE_CURRENT_SOURCE_DIR}"
-	if value == variable || strings.HasPrefix(value, variable+"/") {
-		value = filepath.ToSlash(sourceDir) + strings.TrimPrefix(value, variable)
+	for _, variable := range []struct{ name, directory string }{
+		{"${CMAKE_CURRENT_SOURCE_DIR}", sourceDir},
+		{"${CMAKE_SOURCE_DIR}", root},
+	} {
+		if value == variable.name || strings.HasPrefix(value, variable.name+"/") {
+			value = filepath.ToSlash(variable.directory) + strings.TrimPrefix(value, variable.name)
+			break
+		}
 	}
 	if value == "" || strings.ContainsAny(value, "$;\\<>\r\n") {
 		return "", false

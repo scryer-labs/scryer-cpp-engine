@@ -38,6 +38,7 @@ type callSite struct {
 }
 
 type callGraph struct {
+	Semantic  *semanticFacts   `json:"semantic,omitempty"`
 	ProjectID string           `json:"projectId"`
 	Basis     string           `json:"basis"`
 	Symbols   []functionSymbol `json:"symbols"`

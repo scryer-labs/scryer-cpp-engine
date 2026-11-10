@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/cmake"
 )
 
@@ -22,8 +23,10 @@ type Request struct {
 	Stack           string `json:"stack"`
 	Operation       string `json:"operation"`
 	Scan            struct {
-		Repository string   `json:"repository"`
-		Facts      []string `json:"facts"`
+		Repository      string   `json:"repository"`
+		Static          *bool    `json:"static"`
+		CompileCommands string   `json:"compileCommands"`
+		Facts           []string `json:"facts"`
 	} `json:"scan"`
 }
 
@@ -107,10 +110,20 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		if dependenciesRequested {
 			facts["dependencies"] = map[string]any{"includes": sources.includes, "cmake": buildFacts}
 		}
+		if r.Scan.Static != nil && !*r.Scan.Static && (filesRequested || callsRequested) {
+			resolution, err := clangscan.Resolve(ctx, root, r.Scan.CompileCommands, sources.files, filesRequested, callsRequested)
+			if err != nil {
+				return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
+			}
+			sources.resolution = &resolution
+		}
 		if filesRequested {
 			facts["files"] = describeFiles(root, buildFacts, sources)
 		}
 		if callsRequested {
+			if sources.resolution != nil {
+				sources.graph.Semantic = &semanticFacts{Resolution: sources.resolution, Edges: sources.resolution.Calls}
+			}
 			facts["call-graph"] = sources.graph
 		}
 	}

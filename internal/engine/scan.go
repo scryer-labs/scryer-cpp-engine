@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 	cpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
 )
@@ -19,10 +20,16 @@ type Include struct {
 	Column uint   `json:"-"`
 }
 
+type semanticFacts struct {
+	Resolution *clangscan.Result `json:"resolution"`
+	Edges      []clangscan.Edge  `json:"edges"`
+}
+
 type sourceFacts struct {
-	files    []string
-	includes []Include
-	graph    callGraph
+	resolution *clangscan.Result
+	files      []string
+	includes   []Include
+	graph      callGraph
 }
 
 func scanSources(ctx context.Context, root string, includes, calls bool) (sourceFacts, error) {
@@ -43,8 +50,14 @@ func scanSources(ctx context.Context, root string, includes, calls bool) (source
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if entry.IsDir() && entry.Name() == ".git" && path != root {
-			return filepath.SkipDir
+		if entry.IsDir() && path != root {
+			switch entry.Name() {
+			case ".git", "CMakeFiles", "_deps":
+				return filepath.SkipDir
+			}
+			if _, err := os.Stat(filepath.Join(path, "CMakeCache.txt")); err == nil {
+				return filepath.SkipDir
+			}
 		}
 		if !entry.Type().IsRegular() || !isSource(path) {
 			return nil

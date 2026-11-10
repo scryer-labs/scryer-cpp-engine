@@ -33,6 +33,7 @@ type includeCandidate struct {
 }
 
 type filesReport struct {
+	Semantic   *semanticFacts  `json:"semantic,omitempty"`
 	ProjectID  string          `json:"projectId"`
 	Files      []sourceFile    `json:"files"`
 	References []fileReference `json:"references"`
@@ -59,6 +60,9 @@ func describeFiles(root string, build cmake.Facts, source sourceFacts) filesRepo
 			}
 			entry.Memberships = append(entry.Memberships, membership{Location: source.Location, ComponentID: id})
 		}
+	}
+	if source.resolution != nil {
+		result.Semantic = &semanticFacts{Resolution: source.resolution, Edges: source.resolution.Includes}
 	}
 	search := indexIncludePaths(root, build)
 	propagateIncludeContexts(result.Files, source.includes, byPath, search)
