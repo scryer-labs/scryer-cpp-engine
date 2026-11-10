@@ -20,7 +20,7 @@ cat > "$package/engine.json" <<MANIFEST
   "capabilities": {
     "languages": ["C++"],
     "operations": ["scan"],
-    "scanFacts": ["dependencies", "architecture"]
+    "scanFacts": ["dependencies", "architecture", "files"]
   },
   "library": "bin/libscryer-cpp-engine.dylib",
   "os": "darwin",

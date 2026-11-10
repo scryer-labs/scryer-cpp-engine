@@ -53,7 +53,14 @@ type Unresolved struct {
 	Reason     string `json:"reason"`
 }
 
+type TargetSource struct {
+	Location
+	Target string
+	Path   string
+}
+
 type Facts struct {
+	Sources              []TargetSource       `json:"-"`
 	Targets              []Target             `json:"targets"`
 	Links                []Link               `json:"links"`
 	ExternalDependencies []ExternalDependency `json:"externalDependencies"`
@@ -139,6 +146,8 @@ func (f *Facts) scanFile(ctx context.Context, file, source string) error {
 			}
 		case "add_library", "add_executable":
 			f.target(location, cmd)
+		case "target_sources":
+			f.targetSources(location, cmd)
 		case "target_link_libraries":
 			f.links(location, cmd)
 		case "find_package", "fetchcontent_declare", "externalproject_add":
@@ -199,7 +208,7 @@ func (f *Facts) target(loc Location, cmd invocation) {
 			f.unresolved(loc, cmd, cmd.expression(), "alias target requires evaluation")
 		}
 	} else {
-		for _, arg := range cmd.args[1:] {
+		for i, arg := range cmd.args[1:] {
 			switch arg.text {
 			case "STATIC", "SHARED", "MODULE", "OBJECT", "INTERFACE", "UNKNOWN":
 				if target.Kind == "library" && target.Type == "" {
@@ -212,10 +221,47 @@ func (f *Facts) target(loc Location, cmd invocation) {
 			case "GLOBAL", "WIN32", "MACOSX_BUNDLE", "EXCLUDE_FROM_ALL":
 				continue
 			}
+			if !target.Imported {
+				f.addSources(loc, name, cmd.args[i+1:])
+			}
 			break
 		}
 	}
 	f.Targets = append(f.Targets, target)
+}
+
+func (f *Facts) targetSources(loc Location, cmd invocation) {
+	if len(cmd.args) < 2 {
+		return
+	}
+	target, ok := f.first(loc, cmd)
+	if !ok {
+		return
+	}
+	// File sets have a different grammar and are not interpreted as ordinary sources.
+	for _, arg := range cmd.args[1:] {
+		if arg.text == "FILE_SET" {
+			return
+		}
+	}
+	f.addSources(loc, target, cmd.args[1:])
+}
+
+func (f *Facts) addSources(loc Location, target string, args []argument) {
+	// Relative paths in included scripts depend on their invocation context.
+	if filepath.Base(loc.File) != "CMakeLists.txt" {
+		return
+	}
+	for _, arg := range args {
+		switch arg.text {
+		case "PRIVATE", "PUBLIC", "INTERFACE":
+			continue
+		}
+		if arg.literal() && filepath.IsLocal(filepath.FromSlash(arg.text)) {
+			loc.Line = arg.line
+			f.Sources = append(f.Sources, TargetSource{Location: loc, Target: target, Path: arg.text})
+		}
+	}
 }
 
 func (f *Facts) links(loc Location, cmd invocation) {

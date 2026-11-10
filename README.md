@@ -40,3 +40,9 @@ files that a particular build does not load.
 with source locations and project-scoped component IDs. Link endpoints list
 matching declared component IDs when available. Multiple candidates remain
 visible. Conditional or unresolved CMake inputs remain declarations.
+
+`files` returns C/C++ file paths, explicit CMake source memberships and include
+references. Shared files can have multiple component IDs and unassigned files
+have an empty list. Quoted relative includes are linked when the file exists
+next to the including file or at that relative path. Include search paths,
+variables, generated sources and CMake file sets are outside this resolution.

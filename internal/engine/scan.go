@@ -16,16 +16,22 @@ type Include struct {
 	File   string `json:"file"`
 	Line   uint   `json:"line"`
 	Target string `json:"target"`
+	Column uint   `json:"-"`
 }
 
-func ScanIncludes(ctx context.Context, root string) ([]Include, error) {
+type sourceFacts struct {
+	files    []string
+	includes []Include
+}
+
+func scanSources(ctx context.Context, root string) (sourceFacts, error) {
 	parser := sitter.NewParser()
 	defer parser.Close()
 	if err := parser.SetLanguage(sitter.NewLanguage(cpp.Language())); err != nil {
-		return nil, err
+		return sourceFacts{}, err
 	}
 
-	includes := []Include{}
+	facts := sourceFacts{files: []string{}, includes: []Include{}}
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -47,15 +53,25 @@ func ScanIncludes(ctx context.Context, root string) ([]Include, error) {
 		if err != nil {
 			return err
 		}
-		tree := parser.Parse(source, nil)
+		file = filepath.ToSlash(file)
+		facts.files = append(facts.files, file)
+		tree := parser.ParseWithOptions(func(offset int, _ sitter.Point) []byte {
+			return source[offset:]
+		}, nil, &sitter.ParseOptions{ProgressCallback: func(sitter.ParseState) bool { return ctx.Err() != nil }})
+		if err := ctx.Err(); err != nil {
+			if tree != nil {
+				tree.Close()
+			}
+			return err
+		}
 		if tree == nil {
 			return fmt.Errorf("could not parse %s", file)
 		}
-		err = collectIncludes(ctx, tree.RootNode(), filepath.ToSlash(file), source, &includes)
+		err = collectIncludes(ctx, tree.RootNode(), file, source, &facts.includes)
 		tree.Close()
 		return err
 	})
-	return includes, err
+	return facts, err
 }
 
 func isSource(path string) bool {
@@ -77,7 +93,7 @@ func collectIncludes(ctx context.Context, root *sitter.Node, file string, source
 		node := cursor.Node()
 		if node.Kind() == "preproc_include" {
 			if target := node.ChildByFieldName("path"); target != nil {
-				*includes = append(*includes, Include{File: file, Line: node.StartPosition().Row + 1, Target: target.Utf8Text(source)})
+				*includes = append(*includes, Include{File: file, Line: node.StartPosition().Row + 1, Target: target.Utf8Text(source), Column: target.StartPosition().Column + 1})
 			}
 		}
 		if cursor.GotoFirstChild() {

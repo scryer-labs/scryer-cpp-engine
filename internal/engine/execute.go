@@ -70,7 +70,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		selected = []string{"dependencies"}
 	}
 	for _, fact := range selected {
-		if fact != "dependencies" && fact != "architecture" {
+		if fact != "dependencies" && fact != "architecture" && fact != "files" {
 			return nil, &protocolError{"UNSUPPORTED_FACT", "C++ engine does not support " + fact}
 		}
 	}
@@ -89,12 +89,17 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	if slices.Contains(selected, "architecture") {
 		facts["architecture"] = describeArchitecture(root, buildFacts)
 	}
-	if slices.Contains(selected, "dependencies") {
-		includes, err := ScanIncludes(ctx, root)
+	if slices.Contains(selected, "dependencies") || slices.Contains(selected, "files") {
+		sources, err := scanSources(ctx, root)
 		if err != nil {
 			return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
 		}
-		facts["dependencies"] = map[string]any{"includes": includes, "cmake": buildFacts}
+		if slices.Contains(selected, "dependencies") {
+			facts["dependencies"] = map[string]any{"includes": sources.includes, "cmake": buildFacts}
+		}
+		if slices.Contains(selected, "files") {
+			facts["files"] = describeFiles(root, buildFacts, sources)
+		}
 	}
 	return &report{1, root, facts}, nil
 }
