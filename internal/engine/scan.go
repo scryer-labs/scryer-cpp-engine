@@ -22,9 +22,10 @@ type Include struct {
 type sourceFacts struct {
 	files    []string
 	includes []Include
+	graph    callGraph
 }
 
-func scanSources(ctx context.Context, root string) (sourceFacts, error) {
+func scanSources(ctx context.Context, root string, includes, calls bool) (sourceFacts, error) {
 	parser := sitter.NewParser()
 	defer parser.Close()
 	if err := parser.SetLanguage(sitter.NewLanguage(cpp.Language())); err != nil {
@@ -32,6 +33,9 @@ func scanSources(ctx context.Context, root string) (sourceFacts, error) {
 	}
 
 	facts := sourceFacts{files: []string{}, includes: []Include{}}
+	if calls {
+		facts.graph = callGraph{ProjectID: root, Basis: "tree-sitter-syntax", Symbols: []functionSymbol{}, Calls: []callSite{}}
+	}
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -67,10 +71,13 @@ func scanSources(ctx context.Context, root string) (sourceFacts, error) {
 		if tree == nil {
 			return fmt.Errorf("could not parse %s", file)
 		}
-		err = collectIncludes(ctx, tree.RootNode(), file, source, &facts.includes)
+		err = facts.collect(ctx, tree.RootNode(), file, source, includes, calls)
 		tree.Close()
 		return err
 	})
+	if err == nil && calls {
+		facts.graph.findCandidates()
+	}
 	return facts, err
 }
 
@@ -83,18 +90,22 @@ func isSource(path string) bool {
 	}
 }
 
-func collectIncludes(ctx context.Context, root *sitter.Node, file string, source []byte, includes *[]Include) error {
+func (facts *sourceFacts) collect(ctx context.Context, root *sitter.Node, file string, source []byte, includes, calls bool) error {
 	cursor := root.Walk()
 	defer cursor.Close()
+	var scopes []functionScope
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		node := cursor.Node()
-		if node.Kind() == "preproc_include" {
+		if includes && node.Kind() == "preproc_include" {
 			if target := node.ChildByFieldName("path"); target != nil {
-				*includes = append(*includes, Include{File: file, Line: node.StartPosition().Row + 1, Target: target.Utf8Text(source), Column: target.StartPosition().Column + 1})
+				facts.includes = append(facts.includes, Include{File: file, Line: node.StartPosition().Row + 1, Target: target.Utf8Text(source), Column: target.StartPosition().Column + 1})
 			}
+		}
+		if calls {
+			scopes = facts.graph.collect(node, file, source, scopes)
 		}
 		if cursor.GotoFirstChild() {
 			continue

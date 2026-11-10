@@ -70,7 +70,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		selected = []string{"dependencies"}
 	}
 	for _, fact := range selected {
-		if fact != "dependencies" && fact != "architecture" && fact != "files" {
+		if fact != "dependencies" && fact != "architecture" && fact != "files" && fact != "call-graph" {
 			return nil, &protocolError{"UNSUPPORTED_FACT", "C++ engine does not support " + fact}
 		}
 	}
@@ -81,24 +81,37 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	if info, err := os.Stat(root); err != nil || !info.IsDir() {
 		return nil, &protocolError{"INVALID_REQUEST", "scan repository must be an existing directory"}
 	}
-	buildFacts, err := cmake.Scan(ctx, root)
-	if err != nil {
-		return nil, &protocolError{"CMAKE_SCAN_ERROR", err.Error()}
+	architectureRequested := slices.Contains(selected, "architecture")
+	filesRequested := slices.Contains(selected, "files")
+	dependenciesRequested := slices.Contains(selected, "dependencies")
+	callsRequested := slices.Contains(selected, "call-graph")
+
+	var buildFacts cmake.Facts
+	if architectureRequested || filesRequested || dependenciesRequested {
+		var err error
+		buildFacts, err = cmake.Scan(ctx, root)
+		if err != nil {
+			return nil, &protocolError{"CMAKE_SCAN_ERROR", err.Error()}
+		}
 	}
+
 	facts := make(map[string]any, len(selected))
-	if slices.Contains(selected, "architecture") {
+	if architectureRequested {
 		facts["architecture"] = describeArchitecture(root, buildFacts)
 	}
-	if slices.Contains(selected, "dependencies") || slices.Contains(selected, "files") {
-		sources, err := scanSources(ctx, root)
+	if filesRequested || dependenciesRequested || callsRequested {
+		sources, err := scanSources(ctx, root, filesRequested || dependenciesRequested, callsRequested)
 		if err != nil {
 			return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
 		}
-		if slices.Contains(selected, "dependencies") {
+		if dependenciesRequested {
 			facts["dependencies"] = map[string]any{"includes": sources.includes, "cmake": buildFacts}
 		}
-		if slices.Contains(selected, "files") {
+		if filesRequested {
 			facts["files"] = describeFiles(root, buildFacts, sources)
+		}
+		if callsRequested {
+			facts["call-graph"] = sources.graph
 		}
 	}
 	return &report{1, root, facts}, nil

@@ -46,3 +46,15 @@ references. Shared files can have multiple component IDs and unassigned files
 have an empty list. Quoted relative includes are linked when the file exists
 next to the including file or at that relative path. Include search paths,
 variables, generated sources and CMake file sets are outside this resolution.
+
+`call-graph` returns syntactic function definitions, lambdas and call sites with
+project-relative paths and one-based line/byte-column ranges (end exclusive).
+Calls include the enclosing symbol when one is visible. A unique exact spelling
+in the scanned definitions can appear as a candidate, while compiler-based
+name lookup and overload resolution remain unavailable.
+
+Request all three views with `--facts architecture,files,call-graph`. The project
+ID is the local scan root. Within that project, join components by component ID,
+files by relative path and callers by symbol ID. IDs derived from source locations
+describe one scan snapshot. The scan emits all collected entries for the selected
+facts and parses each source file once per request.
