@@ -1,0 +1,30 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+test "$(go env GOOS)" = darwin
+package=build/install/scryer-cpp-engine
+mkdir -p "$package/bin"
+CGO_ENABLED=1 go build -trimpath -buildmode=c-shared -o "$package/bin/libscryer-cpp-engine.dylib" ./cmd/cpp-engine-abi
+rm -f "$package/bin/libscryer-cpp-engine.h"
+cat > "$package/engine.json" <<MANIFEST
+{
+  "schemaVersion": 1,
+  "engine": {
+    "protocolVersion": 1,
+    "id": "cpp",
+    "name": "Scryer C++ Engine",
+    "version": "0.0.0-dev",
+    "source": "github.com/scryer-labs/scryer-cpp-engine",
+    "mock": false
+  },
+  "capabilities": {
+    "languages": ["C++"],
+    "operations": ["scan"],
+    "scanFacts": ["dependencies"]
+  },
+  "library": "bin/libscryer-cpp-engine.dylib",
+  "os": "darwin",
+  "arch": "$(go env GOARCH)"
+}
+MANIFEST
+cp LICENSE "$package/"
