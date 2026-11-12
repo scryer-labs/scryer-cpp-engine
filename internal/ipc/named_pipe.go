@@ -53,11 +53,12 @@ type Facts struct {
 	Basis   string         `json:"basis"`
 	Calls   []CallEvidence `json:"calls,omitempty"`
 	Windows struct {
-		NamedPipe namedPipe `json:"namedPipe"`
+		NamedPipe    namedPipe     `json:"namedPipe"`
+		SharedMemory *SharedMemory `json:"sharedMemory,omitempty"`
 	} `json:"windows"`
 }
 
-type namedPipeAnalysis struct {
+type ipcAnalysis struct {
 	*Collector
 	byName                map[string][]int
 	output                *namedPipe
@@ -72,10 +73,11 @@ type valueTrace struct {
 func (c *Collector) Facts() Facts {
 	facts := Facts{Basis: "static-source"}
 	facts.Windows.NamedPipe = namedPipe{Endpoints: []Endpoint{}, Parameters: []ParameterEvidence{}, Unresolved: []Unresolved{}}
-	a := namedPipeAnalysis{Collector: c, byName: map[string][]int{}, output: &facts.Windows.NamedPipe, constructorParameters: map[int][]ParameterEvidence{}}
+	a := ipcAnalysis{Collector: c, byName: map[string][]int{}, output: &facts.Windows.NamedPipe, constructorParameters: map[int][]ParameterEvidence{}}
 	for i, f := range c.functions {
 		a.byName[f.name] = append(a.byName[f.name], i)
 	}
+	facts.Windows.SharedMemory = a.sharedMemory()
 	for _, f := range c.functions {
 		for _, call := range f.native {
 			a.native(f, call)
@@ -98,7 +100,7 @@ func (c *Collector) Facts() Facts {
 	return facts
 }
 
-func (a *namedPipeAnalysis) find(scope, symbol string) (int, bool) {
+func (a *ipcAnalysis) find(scope, symbol string) (int, bool) {
 	if strings.HasPrefix(symbol, "::") {
 		matches := a.byName[strings.TrimPrefix(symbol, "::")]
 		if len(matches) == 1 {
@@ -150,7 +152,7 @@ func leafSymbol(name string) string {
 	return name
 }
 
-func (a *namedPipeAnalysis) trace(f function, input *expression, visiting map[int]bool) valueTrace {
+func (a *ipcAnalysis) trace(f function, input *expression, visiting map[int]bool) valueTrace {
 	if input == nil || input.kind != "call" {
 		return valueTrace{value: input}
 	}
@@ -173,7 +175,7 @@ func (a *namedPipeAnalysis) trace(f function, input *expression, visiting map[in
 	return actual
 }
 
-func (a *namedPipeAnalysis) native(f function, call nativeCall) {
+func (a *ipcAnalysis) native(f function, call nativeCall) {
 	if strings.HasPrefix(call.name, "WaitNamedPipe") {
 		return
 	}
@@ -226,7 +228,7 @@ func (a *namedPipeAnalysis) native(f function, call nativeCall) {
 	a.output.Unresolved = append(a.output.Unresolved, Unresolved{call.access, role, steps})
 }
 
-func (a *namedPipeAnalysis) pipeClient(f function, input *expression) (bool, *Evidence) {
+func (a *ipcAnalysis) pipeClient(f function, input *expression) (bool, *Evidence) {
 	if literal := a.literal(f, input); literal != nil && pipeName(literal.value) {
 		return true, nil
 	}
@@ -245,7 +247,7 @@ func (a *namedPipeAnalysis) pipeClient(f function, input *expression) (bool, *Ev
 	return false, nil
 }
 
-func (a *namedPipeAnalysis) literal(f function, input *expression) *expression {
+func (a *ipcAnalysis) literal(f function, input *expression) *expression {
 	if input == nil {
 		return nil
 	}
@@ -282,13 +284,13 @@ func sourceRole(file string) string {
 	return "source"
 }
 
-func (a *namedPipeAnalysis) addParameter(f function, index int, role string, access pipeAccess, steps []Evidence) ParameterEvidence {
+func (a *ipcAnalysis) addParameter(f function, index int, role string, access pipeAccess, steps []Evidence) ParameterEvidence {
 	record := ParameterEvidence{access, f.name, index, role, sourceRole(f.location.File), steps}
 	a.output.Parameters = append(a.output.Parameters, record)
 	return record
 }
 
-func (a *namedPipeAnalysis) factory(f function) {
+func (a *ipcAnalysis) factory(f function) {
 	if f.result == nil || f.result.kind != "construct" {
 		return
 	}

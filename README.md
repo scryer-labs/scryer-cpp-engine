@@ -111,3 +111,22 @@ path or the same source value reaches `WaitNamedPipe` in the function. Test
 observations carry `sourceRole: test` based on the source directory. This is
 bounded source analysis, so dynamic names, arbitrary data flow and cross-project
 matching are outside this scan.
+
+## Windows shared-memory facts
+
+The project-level `ipc` fact also includes `data.windows.sharedMemory` when
+the scan observes a supported Windows file-mapping API. `mappings` groups
+statically recovered object names and keeps each `create` and `open`
+operation with its source location, declared access, and available backing
+evidence. `views` records `MapViewOfFile` and `MapViewOfFileEx` calls.
+`handleSourceCandidateId` points to a single preceding create/open observation
+using the same handle spelling in the function, when available. Mapping
+operations whose names could not be recovered appear under `unresolved`.
+
+Bounded source traces can connect operations to `main` or a file-scope
+initializer through unambiguous calls and supported factory patterns.
+Initializer traces preserve enclosing `#ifdef`/`#ifndef` guards where
+available. Request `architecture,ipc` together to get CMake component IDs
+on entrypoints with declared source membership. These observations describe
+source and access capabilities. Actual memory reads and writes require
+runtime evidence.

@@ -109,7 +109,11 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 			return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
 		}
 		if ipcRequested {
-			facts["ipc"] = sources.ipc.Facts()
+			ipcFacts := sources.ipc.Facts()
+			if memory := ipcFacts.Windows.SharedMemory; memory != nil {
+				attachMappingComponents(memory, buildFacts)
+			}
+			facts["ipc"] = ipcFacts
 		}
 		if dependenciesRequested {
 			facts["dependencies"] = map[string]any{"includes": sources.includes, "cmake": buildFacts}

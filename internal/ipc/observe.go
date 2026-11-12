@@ -42,18 +42,23 @@ type qualifiedCall struct {
 }
 
 type function struct {
-	name       string
-	location   Location
-	parameters []string
-	fields     map[string]*expression
-	result     *expression
-	native     []nativeCall
-	calls      []qualifiedCall
+	name        string
+	location    Location
+	parameters  []string
+	fields      map[string]*expression
+	result      *expression
+	native      []nativeCall
+	mappings    []mappingCall
+	invocations []mappingInvocation
+	pointee     string
+	calls       []qualifiedCall
 }
 
 type Collector struct {
-	functions []function
-	constants map[string]map[string][]*expression
+	functions           []function
+	constants           map[string]map[string][]*expression
+	mappingAliases      map[string]map[string][]string
+	mappingInitializers []mappingInvocation
 }
 
 func location(file string, node *sitter.Node) Location {
@@ -93,8 +98,10 @@ func (c *Collector) Observe(ctx context.Context, root *sitter.Node, file string,
 	}
 	if c.constants == nil {
 		c.constants = map[string]map[string][]*expression{}
+		c.mappingAliases = map[string]map[string][]string{}
 	}
 	c.constants[file] = map[string][]*expression{}
+	c.mappingAliases[file] = map[string][]string{}
 	var scanError error
 	err := walk(ctx, root, func(node *sitter.Node) bool {
 		for len(scopes) > 0 && node.StartByte() >= scopes[len(scopes)-1].end {
@@ -115,8 +122,15 @@ func (c *Collector) Observe(ctx context.Context, root *sitter.Node, file string,
 			}
 			scanError = c.observeFunction(ctx, node, file, strings.Join(parts, "::"), source)
 			return false
+		case "alias_declaration":
+			c.observeMappingAlias(node, file, source)
 		case "declaration":
 			c.observeConstant(node, file, source)
+		case "call_expression":
+			if invocation, ok := readMappingInvocation(node, file, source); ok && mappingInitializer(node) {
+				invocation.conditions = mappingConditions(node, source)
+				c.mappingInitializers = append(c.mappingInitializers, invocation)
+			}
 		}
 		return scanError == nil
 	})
@@ -170,6 +184,9 @@ func (c *Collector) observeFunction(ctx context.Context, node *sitter.Node, file
 		symbol = scope + "::" + symbol
 	}
 	f := function{name: symbol, location: location(file, name), fields: map[string]*expression{}}
+	if result := node.ChildByFieldName("type"); result != nil {
+		f.pointee = mappingPointee(result.Utf8Text(source))
+	}
 	for i := uint(0); i < params.NamedChildCount(); i++ {
 		arg := params.NamedChild(i).ChildByFieldName("declarator")
 		for arg != nil && arg.Kind() != "identifier" {
@@ -205,6 +222,9 @@ func (c *Collector) observeFunction(ctx context.Context, node *sitter.Node, file
 		if call.Kind() != "call_expression" {
 			return true
 		}
+		if invocation, ok := readMappingInvocation(call, file, source); ok {
+			f.invocations = append(f.invocations, invocation)
+		}
 		callee, args := call.ChildByFieldName("function"), call.ChildByFieldName("arguments")
 		if callee == nil || args == nil || args.NamedChildCount() == 0 {
 			return true
@@ -220,6 +240,9 @@ func (c *Collector) observeFunction(ctx context.Context, node *sitter.Node, file
 			f.calls = append(f.calls, qualified)
 		}
 		api := strings.TrimPrefix(callee.Utf8Text(source), "::")
+		if mapping, ok := readMappingCall(api, call, args, file, source); ok {
+			f.mappings = append(f.mappings, mapping)
+		}
 		switch api {
 		case "CreateNamedPipe", "CreateNamedPipeA", "CreateNamedPipeW", "CreateFile", "CreateFileA", "CreateFileW", "WaitNamedPipe", "WaitNamedPipeA", "WaitNamedPipeW":
 			var arguments []*sitter.Node
