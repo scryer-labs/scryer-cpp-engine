@@ -73,7 +73,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		selected = []string{"dependencies"}
 	}
 	for _, fact := range selected {
-		if fact != "dependencies" && fact != "architecture" && fact != "files" && fact != "call-graph" {
+		if fact != "dependencies" && fact != "architecture" && fact != "files" && fact != "call-graph" && fact != "ipc" {
 			return nil, &protocolError{"UNSUPPORTED_FACT", "C++ engine does not support " + fact}
 		}
 	}
@@ -88,6 +88,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	filesRequested := slices.Contains(selected, "files")
 	dependenciesRequested := slices.Contains(selected, "dependencies")
 	callsRequested := slices.Contains(selected, "call-graph")
+	ipcRequested := slices.Contains(selected, "ipc")
 
 	var buildFacts cmake.Facts
 	if architectureRequested || filesRequested || dependenciesRequested {
@@ -102,10 +103,13 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	if architectureRequested {
 		facts["architecture"] = describeArchitecture(root, buildFacts)
 	}
-	if filesRequested || dependenciesRequested || callsRequested {
-		sources, err := scanSources(ctx, root, filesRequested || dependenciesRequested, callsRequested)
+	if filesRequested || dependenciesRequested || callsRequested || ipcRequested {
+		sources, err := scanSources(ctx, root, filesRequested || dependenciesRequested, callsRequested, ipcRequested)
 		if err != nil {
 			return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
+		}
+		if ipcRequested {
+			facts["ipc"] = sources.ipc.Facts()
 		}
 		if dependenciesRequested {
 			facts["dependencies"] = map[string]any{"includes": sources.includes, "cmake": buildFacts}

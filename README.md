@@ -87,3 +87,23 @@ C++ call sites have a project-scoped `callSiteId`. With semantic resolution,
 their translation unit and source evidence and include `callerSymbolId` and
 `targetSymbolId` when they can be matched to the static symbols. Compiler-only
 edges remain in the semantic list even when no syntactic call site matches.
+
+## Windows named-pipe facts
+
+`--facts ipc` scans source for Windows named-pipe evidence without building the
+target. Project JSON exposes it as the `ipc` engine fact under
+`engineFacts[].data.windows.namedPipe`.
+
+- `endpoints` records names recovered from literal strings or simple file-scope
+  constants, with the endpoint role and its source evidence.
+- `parameterEvidence` records a zero-based parameter index when the name
+  flows from a function or constructor parameter into a native IPC call. This
+  includes supported forwarding calls, member initializers and factory
+  construction. The evidence chain records where each step was observed.
+- `unresolved` records recognized IPC calls whose names could not be traced.
+
+`CreateFile` is treated as a client observation when the argument is a named-pipe
+path or the same source value reaches `WaitNamedPipe` in the function. Test
+observations carry `sourceRole: test` based on the source directory. This is
+bounded source analysis, so dynamic names, arbitrary data flow and cross-project
+matching are outside this scan.

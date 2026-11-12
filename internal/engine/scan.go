@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
+	"github.com/scryer-labs/scryer-cpp-engine/internal/ipc"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 	cpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
 )
@@ -30,9 +31,10 @@ type sourceFacts struct {
 	files      []string
 	includes   []Include
 	graph      callGraph
+	ipc        ipc.Collector
 }
 
-func scanSources(ctx context.Context, root string, includes, calls bool) (sourceFacts, error) {
+func scanSources(ctx context.Context, root string, includes, calls, ipcRequested bool) (sourceFacts, error) {
 	parser := sitter.NewParser()
 	defer parser.Close()
 	if err := parser.SetLanguage(sitter.NewLanguage(cpp.Language())); err != nil {
@@ -84,7 +86,12 @@ func scanSources(ctx context.Context, root string, includes, calls bool) (source
 		if tree == nil {
 			return fmt.Errorf("could not parse %s", file)
 		}
-		err = facts.collect(ctx, tree.RootNode(), file, source, includes, calls)
+		if includes || calls {
+			err = facts.collect(ctx, tree.RootNode(), file, source, includes, calls)
+		}
+		if err == nil && ipcRequested {
+			err = facts.ipc.Observe(ctx, tree.RootNode(), file, source)
+		}
 		tree.Close()
 		return err
 	})
