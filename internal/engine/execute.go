@@ -91,7 +91,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	ipcRequested := slices.Contains(selected, "ipc")
 
 	var buildFacts cmake.Facts
-	if architectureRequested || filesRequested || dependenciesRequested {
+	if architectureRequested || filesRequested || dependenciesRequested || ipcRequested {
 		var err error
 		buildFacts, err = cmake.Scan(ctx, root)
 		if err != nil {
@@ -110,9 +110,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		}
 		if ipcRequested {
 			ipcFacts := sources.ipc.Facts()
-			if memory := ipcFacts.Windows.SharedMemory; memory != nil {
-				attachMappingComponents(memory, buildFacts)
-			}
+			attachIPCComponents(&ipcFacts, buildFacts)
 			facts["ipc"] = ipcFacts
 		}
 		if dependenciesRequested {

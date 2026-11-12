@@ -31,17 +31,17 @@ type SharedMapping struct {
 type MappingObservation struct {
 	ID string `json:"id"`
 	Location
-	API                     string              `json:"api"`
-	Operation               string              `json:"operation"`
-	Symbol                  string              `json:"symbol"`
-	SourceRole              string              `json:"sourceRole"`
-	AccessMode              string              `json:"accessMode"`
-	AccessFlags             string              `json:"accessFlags,omitempty"`
-	Handle                  string              `json:"handle,omitempty"`
-	Backing                 string              `json:"backing,omitempty"`
-	NameLocation            *Location           `json:"nameLocation,omitempty"`
-	HandleSourceCandidateID string              `json:"handleSourceCandidateId,omitempty"`
-	Entrypoints             []MappingEntrypoint `json:"entrypoints,omitempty"`
+	API                     string       `json:"api"`
+	Operation               string       `json:"operation"`
+	Symbol                  string       `json:"symbol"`
+	SourceRole              string       `json:"sourceRole"`
+	AccessMode              string       `json:"accessMode"`
+	AccessFlags             string       `json:"accessFlags,omitempty"`
+	Handle                  string       `json:"handle,omitempty"`
+	Backing                 string       `json:"backing,omitempty"`
+	NameLocation            *Location    `json:"nameLocation,omitempty"`
+	HandleSourceCandidateID string       `json:"handleSourceCandidateId,omitempty"`
+	Entrypoints             []Entrypoint `json:"entrypoints,omitempty"`
 }
 
 func readMappingCall(api string, call, arguments *sitter.Node, file string, source []byte) (mappingCall, bool) {
@@ -139,25 +139,21 @@ func mappingAccess(action, flags string) string {
 	return "unknown"
 }
 
-func (a *ipcAnalysis) sharedMemory() *SharedMemory {
+func (a *ipcAnalysis) sharedMemory(entrypoints func(int) []Entrypoint) *SharedMemory {
 	result := &SharedMemory{Mappings: []SharedMapping{}, Views: []MappingObservation{}, Unresolved: []MappingObservation{}}
 	mappings := map[string]int{}
-	var entries *mappingTrace
 	for i, f := range a.functions {
 		if len(f.mappings) == 0 {
 			continue
 		}
-		if entries == nil {
-			entries = a.indexMappingInvocations()
-		}
-		entrypoints := entries.entrypoints(i)
+		roots := entrypoints(i)
 		handles := map[string][]string{}
 		for _, call := range f.mappings {
 			obs := MappingObservation{
 				ID:       call.location.File + ":" + strconv.FormatUint(uint64(call.location.Line), 10) + ":" + strconv.FormatUint(uint64(call.location.Column), 10),
 				Location: call.location, API: call.api, Operation: call.action, Symbol: f.name,
 				SourceRole: sourceRole(f.location.File), AccessFlags: call.flags, AccessMode: mappingAccess(call.action, call.flags),
-				Handle: call.handle, Backing: call.backing, Entrypoints: entrypoints,
+				Handle: call.handle, Backing: call.backing, Entrypoints: roots,
 			}
 			if call.action == "map" {
 				if sources := handles[call.handle]; len(sources) == 1 && call.handle != "" {

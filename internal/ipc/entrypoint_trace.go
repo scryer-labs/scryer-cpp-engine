@@ -7,7 +7,7 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-type MappingEntrypoint struct {
+type Entrypoint struct {
 	Location
 	Kind         string     `json:"kind"`
 	Conditions   []string   `json:"conditions,omitempty"`
@@ -128,16 +128,17 @@ type mappingCaller struct {
 	evidence Evidence
 }
 
-type mappingTrace struct {
+type entrypointTrace struct {
 	callers map[int][]mappingCaller
-	roots   map[int][]MappingEntrypoint
+	roots   map[int][]Entrypoint
 }
 
-func (a *ipcAnalysis) indexMappingInvocations() *mappingTrace {
-	trace := &mappingTrace{callers: map[int][]mappingCaller{}, roots: map[int][]MappingEntrypoint{}}
+func (a *ipcAnalysis) indexEntrypoints() *entrypointTrace {
+	trace := &entrypointTrace{callers: map[int][]mappingCaller{}, roots: map[int][]Entrypoint{}}
 	for i, f := range a.functions {
-		if f.name == "main" {
-			trace.roots[i] = append(trace.roots[i], MappingEntrypoint{Location: f.location, Kind: "main"})
+		switch f.name {
+		case "main", "wmain", "WinMain", "wWinMain":
+			trace.roots[i] = append(trace.roots[i], Entrypoint{Location: f.location, Kind: "main"})
 		}
 		for _, call := range f.invocations {
 			if target, ok := a.mappingCallee(call, parentSymbol(f.name)); ok && target != i {
@@ -149,7 +150,7 @@ func (a *ipcAnalysis) indexMappingInvocations() *mappingTrace {
 	for _, call := range a.mappingInitializers {
 		if target, ok := a.mappingCallee(call, ""); ok {
 			evidence := Evidence{call.Location, "call", a.functions[target].name}
-			trace.roots[target] = append(trace.roots[target], MappingEntrypoint{
+			trace.roots[target] = append(trace.roots[target], Entrypoint{
 				Location: call.Location, Kind: "initializer", Conditions: call.conditions, CallChain: []Evidence{evidence},
 			})
 		}
@@ -158,14 +159,14 @@ func (a *ipcAnalysis) indexMappingInvocations() *mappingTrace {
 }
 
 // Retain one shortest trace per reachable entrypoint.
-func (t *mappingTrace) entrypoints(function int) []MappingEntrypoint {
+func (t *entrypointTrace) entrypoints(function int) []Entrypoint {
 	type visit struct {
 		function int
 		path     []Evidence
 	}
 	pending := []visit{{function: function}}
 	seen := map[int]bool{function: true}
-	var entries []MappingEntrypoint
+	var entries []Entrypoint
 	for i := 0; i < len(pending); i++ {
 		current := pending[i]
 		for _, root := range t.roots[current.function] {

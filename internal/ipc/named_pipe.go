@@ -8,10 +8,11 @@ import (
 
 type Endpoint struct {
 	pipeAccess
-	Role       string     `json:"role"`
-	Name       string     `json:"name"`
-	SourceRole string     `json:"sourceRole"`
-	Evidence   []Evidence `json:"evidence"`
+	Role        string       `json:"role"`
+	Name        string       `json:"name"`
+	SourceRole  string       `json:"sourceRole"`
+	Evidence    []Evidence   `json:"evidence"`
+	Entrypoints []Entrypoint `json:"entrypoints,omitempty"`
 }
 
 type ParameterEvidence struct {
@@ -47,6 +48,7 @@ type CallEvidence struct {
 	CandidateSymbols []string       `json:"candidateSymbols"`
 	SourceRole       string         `json:"sourceRole"`
 	Arguments        []CallArgument `json:"arguments"`
+	Entrypoints      []Entrypoint   `json:"entrypoints,omitempty"`
 }
 
 type Facts struct {
@@ -77,18 +79,46 @@ func (c *Collector) Facts() Facts {
 	for i, f := range c.functions {
 		a.byName[f.name] = append(a.byName[f.name], i)
 	}
-	facts.Windows.SharedMemory = a.sharedMemory()
-	for _, f := range c.functions {
+	var trace *entrypointTrace
+	traced := make(map[int][]Entrypoint)
+	entrypoints := func(index int) []Entrypoint {
+		if roots, ok := traced[index]; ok {
+			return roots
+		}
+		if trace == nil {
+			trace = a.indexEntrypoints()
+		}
+		roots := trace.entrypoints(index)
+		traced[index] = roots
+		return roots
+	}
+	facts.Windows.SharedMemory = a.sharedMemory(entrypoints)
+	for i, f := range c.functions {
 		for _, call := range f.native {
-			a.native(f, call)
+			if endpoint := a.native(f, call); endpoint != nil {
+				endpoint.Entrypoints = entrypoints(i)
+				a.output.Endpoints = append(a.output.Endpoints, *endpoint)
+			}
 		}
 	}
-	for _, f := range c.functions {
+	for i, f := range c.functions {
 		a.factory(f)
 		for _, call := range f.calls {
+			if !call.qualified {
+				if _, ok := a.find(parentSymbol(f.name), call.symbol); !ok {
+					continue
+				}
+			}
 			evidence := CallEvidence{Location: call.location, Callee: call.symbol, CandidateSymbols: qualifiedCandidates(parentSymbol(f.name), call.symbol), SourceRole: sourceRole(call.location.File)}
 			for index, argument := range call.arguments {
 				if literal := a.literal(f, argument); literal != nil {
+					isPipe := pipeName(literal.value)
+					if !call.qualified && !isPipe {
+						continue
+					}
+					if isPipe {
+						evidence.Entrypoints = entrypoints(i)
+					}
 					evidence.Arguments = append(evidence.Arguments, CallArgument{ParameterIndex: index, Value: literal.value, Location: literal.location})
 				}
 			}
@@ -175,9 +205,9 @@ func (a *ipcAnalysis) trace(f function, input *expression, visiting map[int]bool
 	return actual
 }
 
-func (a *ipcAnalysis) native(f function, call nativeCall) {
+func (a *ipcAnalysis) native(f function, call nativeCall) *Endpoint {
 	if strings.HasPrefix(call.name, "WaitNamedPipe") {
-		return
+		return nil
 	}
 	traced := a.trace(f, call.input, map[int]bool{})
 	role := "server"
@@ -188,7 +218,7 @@ func (a *ipcAnalysis) native(f function, call nativeCall) {
 		// to wake their own listener. Require pipe-specific evidence here.
 		known, evidence := a.pipeClient(f, traced.value)
 		if !known {
-			return
+			return nil
 		}
 		confirmation = evidence
 	}
@@ -199,14 +229,13 @@ func (a *ipcAnalysis) native(f function, call nativeCall) {
 	steps = append(steps, Evidence{call.location, "native-api", call.name})
 	if literal := a.literal(f, traced.value); literal != nil && pipeName(literal.value) {
 		evidence := append([]Evidence{{literal.location, "endpoint-name", literal.value}}, steps...)
-		a.output.Endpoints = append(a.output.Endpoints, Endpoint{call.access, role, literal.value, sourceRole(f.location.File), evidence})
-		return
+		return &Endpoint{pipeAccess: call.access, Role: role, Name: literal.value, SourceRole: sourceRole(f.location.File), Evidence: evidence}
 	}
 	if traced.value != nil {
 		name := traced.value.value
 		if index := parameterIndex(f, traced.value); index >= 0 {
 			a.addParameter(f, index, role, call.access, steps)
-			return
+			return nil
 		}
 		if traced.value.kind == "name" || traced.value.kind == "member" {
 			class := parentSymbol(f.name)
@@ -220,12 +249,13 @@ func (a *ipcAnalysis) native(f function, call nativeCall) {
 					evidence = append(evidence, steps...)
 					record := a.addParameter(constructor, index, role, call.access, evidence)
 					a.constructorParameters[i] = append(a.constructorParameters[i], record)
-					return
+					return nil
 				}
 			}
 		}
 	}
 	a.output.Unresolved = append(a.output.Unresolved, Unresolved{call.access, role, steps})
+	return nil
 }
 
 func (a *ipcAnalysis) pipeClient(f function, input *expression) (bool, *Evidence) {

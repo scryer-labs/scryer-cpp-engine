@@ -35,7 +35,8 @@ type nativeCall struct {
 	location Location
 }
 
-type qualifiedCall struct {
+type ipcCall struct {
+	qualified bool
 	symbol    string
 	arguments []*expression
 	location  Location
@@ -51,7 +52,7 @@ type function struct {
 	mappings    []mappingCall
 	invocations []mappingInvocation
 	pointee     string
-	calls       []qualifiedCall
+	calls       []ipcCall
 }
 
 type Collector struct {
@@ -229,15 +230,16 @@ func (c *Collector) observeFunction(ctx context.Context, node *sitter.Node, file
 		if callee == nil || args == nil || args.NamedChildCount() == 0 {
 			return true
 		}
-		if callee.Kind() == "qualified_identifier" {
-			qualified := qualifiedCall{symbol: callee.Utf8Text(source), location: location(file, call)}
+		isQualified := callee.Kind() == "qualified_identifier"
+		if isQualified || callee.Kind() == "identifier" {
+			observed := ipcCall{qualified: isQualified, symbol: callee.Utf8Text(source), location: location(file, call)}
 			for i := uint(0); i < args.NamedChildCount(); i++ {
 				arg := args.NamedChild(i)
 				if arg.Kind() != "comment" {
-					qualified.arguments = append(qualified.arguments, readExpression(arg, file, source))
+					observed.arguments = append(observed.arguments, readExpression(arg, file, source))
 				}
 			}
-			f.calls = append(f.calls, qualified)
+			f.calls = append(f.calls, observed)
 		}
 		api := strings.TrimPrefix(callee.Utf8Text(source), "::")
 		if mapping, ok := readMappingCall(api, call, args, file, source); ok {

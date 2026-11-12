@@ -104,7 +104,9 @@ target. Project JSON exposes it as the `ipc` engine fact under
 
 Alongside `windows.namedPipe`, `data.calls` records qualified calls with statically known string arguments and
 candidate symbols. Core can join these observations to parameter evidence
-from a referenced library. The calls themselves carry no endpoint role.
+from the project or a referenced library. The calls themselves carry no endpoint
+role. Named endpoints and pipe-name calls can include entrypoint evidence and
+the CMake executable IDs associated with the entrypoint source.
 
 `CreateFile` is treated as a client observation when the argument is a named-pipe
 path or the same source value reaches `WaitNamedPipe` in the function. Test
@@ -126,7 +128,7 @@ operations whose names could not be recovered appear under `unresolved`.
 Bounded source traces can connect operations to `main` or a file-scope
 initializer through unambiguous calls and supported factory patterns.
 Initializer traces preserve enclosing `#ifdef`/`#ifndef` guards where
-available. Request `architecture,ipc` together to get CMake component IDs
-on entrypoints with declared source membership. These observations describe
+available. The IPC scan attaches CMake executable IDs to entrypoints with
+declared source membership. Include `architecture` to get the component table. These observations describe
 source and access capabilities. Actual memory reads and writes require
 runtime evidence.
