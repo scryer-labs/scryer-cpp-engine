@@ -31,6 +31,7 @@ type expression struct {
 type nativeCall struct {
 	name     string
 	input    *expression
+	access   pipeAccess
 	location Location
 }
 
@@ -221,7 +222,20 @@ func (c *Collector) observeFunction(ctx context.Context, node *sitter.Node, file
 		api := strings.TrimPrefix(callee.Utf8Text(source), "::")
 		switch api {
 		case "CreateNamedPipe", "CreateNamedPipeA", "CreateNamedPipeW", "CreateFile", "CreateFileA", "CreateFileW", "WaitNamedPipe", "WaitNamedPipeA", "WaitNamedPipeW":
-			f.native = append(f.native, nativeCall{api, readExpression(args.NamedChild(0), file, source), location(file, call)})
+			var arguments []*sitter.Node
+			for i := uint(0); i < args.NamedChildCount() && len(arguments) < 2; i++ {
+				if arg := args.NamedChild(i); arg.Kind() != "comment" {
+					arguments = append(arguments, arg)
+				}
+			}
+			if len(arguments) == 0 {
+				break
+			}
+			native := nativeCall{name: api, input: readExpression(arguments[0], file, source), location: location(file, call)}
+			if len(arguments) == 2 && !strings.HasPrefix(api, "WaitNamedPipe") {
+				native.access = readPipeAccess(api, arguments[1], source)
+			}
+			f.native = append(f.native, native)
 		}
 		return true
 	})

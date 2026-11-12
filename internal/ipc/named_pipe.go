@@ -7,6 +7,7 @@ import (
 )
 
 type Endpoint struct {
+	pipeAccess
 	Role       string     `json:"role"`
 	Name       string     `json:"name"`
 	SourceRole string     `json:"sourceRole"`
@@ -14,6 +15,7 @@ type Endpoint struct {
 }
 
 type ParameterEvidence struct {
+	pipeAccess
 	Symbol         string     `json:"symbol"`
 	ParameterIndex int        `json:"parameterIndex"`
 	Role           string     `json:"role"`
@@ -22,6 +24,7 @@ type ParameterEvidence struct {
 }
 
 type Unresolved struct {
+	pipeAccess
 	Role     string     `json:"role"`
 	Evidence []Evidence `json:"evidence"`
 }
@@ -194,13 +197,13 @@ func (a *namedPipeAnalysis) native(f function, call nativeCall) {
 	steps = append(steps, Evidence{call.location, "native-api", call.name})
 	if literal := a.literal(f, traced.value); literal != nil && pipeName(literal.value) {
 		evidence := append([]Evidence{{literal.location, "endpoint-name", literal.value}}, steps...)
-		a.output.Endpoints = append(a.output.Endpoints, Endpoint{role, literal.value, sourceRole(f.location.File), evidence})
+		a.output.Endpoints = append(a.output.Endpoints, Endpoint{call.access, role, literal.value, sourceRole(f.location.File), evidence})
 		return
 	}
 	if traced.value != nil {
 		name := traced.value.value
 		if index := parameterIndex(f, traced.value); index >= 0 {
-			a.addParameter(f, index, role, steps)
+			a.addParameter(f, index, role, call.access, steps)
 			return
 		}
 		if traced.value.kind == "name" || traced.value.kind == "member" {
@@ -213,14 +216,14 @@ func (a *namedPipeAnalysis) native(f function, call nativeCall) {
 				if index := parameterIndex(constructor, value.value); index >= 0 {
 					evidence := append([]Evidence{{value.value.location, "member-initializer", name}}, value.steps...)
 					evidence = append(evidence, steps...)
-					record := a.addParameter(constructor, index, role, evidence)
+					record := a.addParameter(constructor, index, role, call.access, evidence)
 					a.constructorParameters[i] = append(a.constructorParameters[i], record)
 					return
 				}
 			}
 		}
 	}
-	a.output.Unresolved = append(a.output.Unresolved, Unresolved{role, steps})
+	a.output.Unresolved = append(a.output.Unresolved, Unresolved{call.access, role, steps})
 }
 
 func (a *namedPipeAnalysis) pipeClient(f function, input *expression) (bool, *Evidence) {
@@ -279,8 +282,8 @@ func sourceRole(file string) string {
 	return "source"
 }
 
-func (a *namedPipeAnalysis) addParameter(f function, index int, role string, steps []Evidence) ParameterEvidence {
-	record := ParameterEvidence{f.name, index, role, sourceRole(f.location.File), steps}
+func (a *namedPipeAnalysis) addParameter(f function, index int, role string, access pipeAccess, steps []Evidence) ParameterEvidence {
+	record := ParameterEvidence{access, f.name, index, role, sourceRole(f.location.File), steps}
 	a.output.Parameters = append(a.output.Parameters, record)
 	return record
 }
@@ -302,7 +305,7 @@ func (a *namedPipeAnalysis) factory(f function) {
 		steps := append([]Evidence{{f.result.location, "factory-construction", record.Symbol}}, actual.steps...)
 		steps = append(steps, record.Evidence...)
 		if index := parameterIndex(f, actual.value); index >= 0 {
-			a.addParameter(f, index, record.Role, steps)
+			a.addParameter(f, index, record.Role, record.pipeAccess, steps)
 		}
 	}
 }

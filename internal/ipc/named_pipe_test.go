@@ -21,10 +21,12 @@ struct Resource {
 	std::string field;
 };
 Resource::Resource(std::string_view value) : field{value} {}
-void Resource::run() { CreateNamedPipeW(convert(field).c_str(), 0); }
+void Resource::run() { CreateNamedPipeW(convert(field).c_str(), (PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED)); }
 auto X(std::string_view Y) { return std::make_unique<Resource>(Y); }
 const auto Literal = R"(\\.\pipe\one)";
-void start() { CreateNamedPipeW(Literal, 0); }
+void start() { CreateNamedPipeW(Literal, PIPE_ACCESS_INBOUND); }
+void connect() { CreateFileW(Literal, GENERIC_WRITE | GENERIC_READ); }
+void unknown() { CreateFileW(Literal, GENERIC_WRITE & mask); }
 void other() { CreateFileW(L"ordinary.txt", 0); }
 }
 `)
@@ -40,14 +42,19 @@ void other() { CreateFileW(L"ordinary.txt", 0); }
 		t.Fatal(err)
 	}
 	facts := collector.Facts().Windows.NamedPipe
-	if len(facts.Endpoints) != 1 || facts.Endpoints[0].Name != `\\.\pipe\one` || facts.Endpoints[0].SourceRole != "test" {
+	if len(facts.Endpoints) != 3 || facts.Endpoints[0].Name != `\\.\pipe\one` || facts.Endpoints[0].SourceRole != "test" {
 		t.Fatalf("unexpected concrete endpoints: %+v", facts.Endpoints)
+	}
+	for i, want := range []string{"read", "read-write", "unknown"} {
+		if got := facts.Endpoints[i]; got.AccessMode != want || got.AccessFlags == "" {
+			t.Fatalf("endpoint %d: wanted access %s, got %+v", i, want, got)
+		}
 	}
 	if len(facts.Parameters) != 2 {
 		t.Fatalf("expected the constructor and its factory: %+v", facts.Parameters)
 	}
 	factory := facts.Parameters[1]
-	if factory.Symbol != "app::X" || factory.ParameterIndex != 0 || factory.Role != "server" {
+	if factory.Symbol != "app::X" || factory.ParameterIndex != 0 || factory.Role != "server" || factory.AccessMode != "write" || factory.AccessFlags != "(PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED)" {
 		t.Fatalf("unexpected factory: %+v", factory)
 	}
 	var operations []string
