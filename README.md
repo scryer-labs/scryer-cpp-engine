@@ -102,6 +102,10 @@ target. Project JSON exposes it as the `ipc` engine fact under
   construction. The evidence chain records where each step was observed.
 - `unresolved` records recognized IPC calls whose names could not be traced.
 
+Alongside `windows.namedPipe`, `data.calls` records qualified calls with statically known string arguments and
+candidate symbols. Core can join these observations to parameter evidence
+from a referenced library. The calls themselves carry no endpoint role.
+
 `CreateFile` is treated as a client observation when the argument is a named-pipe
 path or the same source value reaches `WaitNamedPipe` in the function. Test
 observations carry `sourceRole: test` based on the source directory. This is

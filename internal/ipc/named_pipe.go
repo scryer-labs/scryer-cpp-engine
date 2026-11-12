@@ -32,8 +32,23 @@ type namedPipe struct {
 	Unresolved []Unresolved        `json:"unresolved"`
 }
 
+type CallArgument struct {
+	ParameterIndex int      `json:"parameterIndex"`
+	Value          string   `json:"value"`
+	Location       Location `json:"location"`
+}
+
+type CallEvidence struct {
+	Location
+	Callee           string         `json:"callee"`
+	CandidateSymbols []string       `json:"candidateSymbols"`
+	SourceRole       string         `json:"sourceRole"`
+	Arguments        []CallArgument `json:"arguments"`
+}
+
 type Facts struct {
-	Basis   string `json:"basis"`
+	Basis   string         `json:"basis"`
+	Calls   []CallEvidence `json:"calls,omitempty"`
 	Windows struct {
 		NamedPipe namedPipe `json:"namedPipe"`
 	} `json:"windows"`
@@ -65,6 +80,17 @@ func (c *Collector) Facts() Facts {
 	}
 	for _, f := range c.functions {
 		a.factory(f)
+		for _, call := range f.calls {
+			evidence := CallEvidence{Location: call.location, Callee: call.symbol, CandidateSymbols: qualifiedCandidates(parentSymbol(f.name), call.symbol), SourceRole: sourceRole(call.location.File)}
+			for index, argument := range call.arguments {
+				if literal := a.literal(f, argument); literal != nil {
+					evidence.Arguments = append(evidence.Arguments, CallArgument{ParameterIndex: index, Value: literal.value, Location: literal.location})
+				}
+			}
+			if len(evidence.Arguments) > 0 {
+				facts.Calls = append(facts.Calls, evidence)
+			}
+		}
 	}
 	return facts
 }
@@ -93,6 +119,18 @@ func (a *namedPipeAnalysis) find(scope, symbol string) (int, bool) {
 		}
 		scope = parentSymbol(scope)
 	}
+}
+
+func qualifiedCandidates(scope, symbol string) []string {
+	if strings.HasPrefix(symbol, "::") {
+		return []string{strings.TrimPrefix(symbol, "::")}
+	}
+	var candidates []string
+	for scope != "" {
+		candidates = append(candidates, scope+"::"+symbol)
+		scope = parentSymbol(scope)
+	}
+	return append(candidates, symbol)
 }
 
 func parentSymbol(name string) string {

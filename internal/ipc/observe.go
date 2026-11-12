@@ -34,6 +34,12 @@ type nativeCall struct {
 	location Location
 }
 
+type qualifiedCall struct {
+	symbol    string
+	arguments []*expression
+	location  Location
+}
+
 type function struct {
 	name       string
 	location   Location
@@ -41,6 +47,7 @@ type function struct {
 	fields     map[string]*expression
 	result     *expression
 	native     []nativeCall
+	calls      []qualifiedCall
 }
 
 type Collector struct {
@@ -193,13 +200,23 @@ func (c *Collector) observeFunction(ctx context.Context, node *sitter.Node, file
 	if body.NamedChildCount() == 1 && body.NamedChild(0).Kind() == "return_statement" {
 		f.result = readExpression(body.NamedChild(0).NamedChild(0), file, source)
 	}
-	err := walk(ctx, body, func(call *sitter.Node) bool {
+	err := walk(ctx, node, func(call *sitter.Node) bool {
 		if call.Kind() != "call_expression" {
 			return true
 		}
 		callee, args := call.ChildByFieldName("function"), call.ChildByFieldName("arguments")
 		if callee == nil || args == nil || args.NamedChildCount() == 0 {
 			return true
+		}
+		if callee.Kind() == "qualified_identifier" {
+			qualified := qualifiedCall{symbol: callee.Utf8Text(source), location: location(file, call)}
+			for i := uint(0); i < args.NamedChildCount(); i++ {
+				arg := args.NamedChild(i)
+				if arg.Kind() != "comment" {
+					qualified.arguments = append(qualified.arguments, readExpression(arg, file, source))
+				}
+			}
+			f.calls = append(f.calls, qualified)
 		}
 		api := strings.TrimPrefix(callee.Utf8Text(source), "::")
 		switch api {
