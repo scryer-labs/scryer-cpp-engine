@@ -9,9 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -128,11 +128,12 @@ func configure(ctx context.Context, root, directory string) error {
 	generator := "Unix Makefiles"
 	if _, err := exec.LookPath("ninja"); err == nil {
 		generator = "Ninja"
+	} else if runtime.GOOS == "windows" {
+		return fmt.Errorf("Ninja is required to generate a Windows compilation database")
 	}
 	cmd := exec.CommandContext(ctx, "cmake", "-S", root, "-B", directory, "-G", generator, "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
 	cmd.Dir = directory
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	configureCancellation(cmd)
 	cmd.WaitDelay = 3 * time.Second
 	log := &tailBuffer{}
 	cmd.Stdout, cmd.Stderr = log, log
