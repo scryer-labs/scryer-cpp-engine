@@ -1,17 +1,25 @@
 # Scryer C++ Engine
 
-A macOS Scryer engine that embeds the Tree-sitter C++ parser and implements
-Scryer's C ABI v1. The package contains a shared library and an engine manifest.
+A Scryer engine for C++, C and CMake facts. It embeds the Tree-sitter parser
+and ships a C ABI v1 library and an engine manifest.
 
-## Build and install
+## Install and scan
 
-Build with Go and a local C compiler with cgo enabled. From this repository:
+With a current Scryer CLI, install or upgrade the official macOS arm64 or
+Windows amd64 package:
+
+```sh
+scryer engine install cpp
+scryer engine upgrade cpp
+scryer project scan /path/to/project --facts dependencies,architecture,files,call-graph,ipc --json --compact
+```
+
+For engine development, build with the Go version in `go.mod`, cgo and a C
+compiler. Install the resulting local package into Scryer:
 
 ```sh
 ./scripts/build
 scryer engine install cpp --from "$PWD/build/install/scryer-cpp-engine"
-scryer engine list --json
-scryer project scan /path/to/project --facts dependencies --json
 ```
 
 The installed package embeds Tree-sitter. Scanning requires neither a C++
@@ -60,8 +68,9 @@ outside this static resolution.
 `call-graph` returns syntactic function definitions, lambdas and call sites with
 project-relative paths and one-based line/byte-column ranges (end exclusive).
 Calls include the enclosing symbol when one is visible. A unique exact spelling
-in the scanned definitions can appear as a candidate, while compiler-based
-name lookup and overload resolution remain unavailable.
+in the scanned definitions can appear as a candidate. With `--resolve`, semantic
+edges can link `callSiteId`, `callerSymbolId` and `targetSymbolId` when compiler
+evidence and source locations allow.
 
 Request all three views with `--facts architecture,files,call-graph`. The project
 ID is the local scan root. Within that project, join components by component ID,
@@ -72,8 +81,9 @@ facts and parses each source file once per request.
 ## Optional libclang resolution
 
 With `--facts files,call-graph --resolve`, the engine loads libclang at runtime
-from the selected Xcode toolchain or a local LLVM installation. Set
-`SCRYER_LIBCLANG` to prefer a specific library. Static scans do not load LLVM.
+from the selected Xcode toolchain or a local LLVM installation on macOS,
+or from LLVM on Windows. Set `SCRYER_LIBCLANG` to prefer a specific library.
+Static scans do not load LLVM. Windows release checks cover static scans.
 
 The engine prefers a supplied `--compile-commands` path, then a database at the
 project root, then a unique database under the project. When none is found, it
@@ -132,3 +142,8 @@ available. The IPC scan attaches CMake executable IDs to entrypoints with
 declared source membership. Include `architecture` to get the component table. These observations describe
 source and access capabilities. Actual memory reads and writes require
 runtime evidence.
+
+## Release verification
+
+The [GitHub workflow](.github/workflows/ci.yml) builds the platform packages
+and exercises a scan through the ABI before publishing a version tag.
