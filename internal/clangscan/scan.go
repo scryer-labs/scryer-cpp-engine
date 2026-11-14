@@ -1,4 +1,4 @@
-//go:build cgo && darwin
+//go:build cgo && (darwin || windows)
 
 // Package clangscan enriches static facts with an optional local libclang.
 package clangscan

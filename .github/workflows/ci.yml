@@ -1,0 +1,70 @@
+name: C++ engine packages
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15
+            os: darwin
+            arch: arm64
+          - runner: windows-2025
+            os: windows
+            arch: amd64
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+      - name: Select Windows C compiler
+        if: matrix.os == 'windows'
+        run: |
+          echo 'C:\msys64\mingw64\bin' >> "$GITHUB_PATH"
+      - name: Build and test package
+        run: |
+          set -eu
+          export CGO_ENABLED=1
+          test "$(go env GOOS)" = "${{ matrix.os }}"
+          test "$(go env GOARCH)" = "${{ matrix.arch }}"
+          go test ./...
+          go vet ./...
+          tag=v0.0.0-dev
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+            [[ "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          fi
+          SCRYER_ENGINE_VERSION="${tag#v}" ./scripts/build
+          python scripts/check-package.py build/install/scryer-cpp-engine
+          python -m zipfile -c "scryer-cpp-engine-$tag-${{ matrix.os }}-${{ matrix.arch }}.zip" \
+            build/install/scryer-cpp-engine/*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cpp-${{ matrix.os }}-${{ matrix.arch }}
+          path: scryer-cpp-engine-*.zip
+          if-no-files-found: error
+  publish:
+    if: github.ref_type == 'tag'
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Publish tested release packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" assets/*.zip --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes

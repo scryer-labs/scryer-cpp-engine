@@ -1,6 +1,26 @@
-#include "bridge.h"
-#include <dlfcn.h>
 #include <stdlib.h>
+#include "bridge.h"
+#ifdef _WIN32
+#include <windows.h>
+static void *open_library(const char *path) {
+    int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
+    if (!size) return NULL;
+    wchar_t *wide = calloc(size, sizeof(wchar_t));
+    if (!wide) return NULL;
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, wide, size);
+    HMODULE library = LoadLibraryExW(wide, NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+    free(wide);
+    return (void *)library;
+}
+#define lookup_library(library, symbol) ((void *)GetProcAddress((HMODULE)(library), symbol))
+#define close_library(library) FreeLibrary((HMODULE)(library))
+#else
+#include <dlfcn.h>
+#define open_library(path) dlopen(path, RTLD_NOW | RTLD_LOCAL)
+#define lookup_library(library, symbol) dlsym(library, symbol)
+#define close_library(library) dlclose(library)
+#endif
+
 
 // Public libclang C ABI types, kept here so static scans need no LLVM headers.
 typedef void *CXIndex;
@@ -41,11 +61,11 @@ struct ScryerClang {
     void (*disposeString)(CXString);
 };
 
-#define LOAD(field, symbol) do { api->field = dlsym(api->library, symbol); if (!api->field) goto failure; } while (0)
+#define LOAD(field, symbol) do { api->field = lookup_library(api->library, symbol); if (!api->field) goto failure; } while (0)
 ScryerClang *scryer_clang_open(const char *path) {
     ScryerClang *api = calloc(1, sizeof(*api));
     if (!api) return NULL;
-    api->library = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+    api->library = open_library(path);
     if (!api->library) goto failure;
     LOAD(createIndex, "clang_createIndex");
     LOAD(disposeIndex, "clang_disposeIndex");
@@ -79,7 +99,7 @@ failure:
 #undef LOAD
 
 void scryer_clang_close(ScryerClang *api) {
-    if (api->library) dlclose(api->library);
+    if (api->library) close_library(api->library);
     free(api);
 }
 

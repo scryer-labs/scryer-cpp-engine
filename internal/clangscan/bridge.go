@@ -1,4 +1,4 @@
-//go:build cgo && darwin
+//go:build cgo && (darwin || windows)
 
 package clangscan
 
@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"runtime/cgo"
 	"strings"
 	"unsafe"
@@ -21,11 +22,15 @@ import (
 
 func openClang(ctx context.Context) (*C.ScryerClang, string) {
 	paths := []string{os.Getenv("SCRYER_LIBCLANG")}
-	if output, err := exec.CommandContext(ctx, "xcode-select", "-p").Output(); err == nil {
-		paths = append(paths, filepath.Join(strings.TrimSpace(string(output)), "usr/lib/libclang.dylib"),
-			filepath.Join(strings.TrimSpace(string(output)), "Toolchains/XcodeDefault.xctoolchain/usr/lib/libclang.dylib"))
+	if runtime.GOOS == "darwin" {
+		if output, err := exec.CommandContext(ctx, "xcode-select", "-p").Output(); err == nil {
+			paths = append(paths, filepath.Join(strings.TrimSpace(string(output)), "usr/lib/libclang.dylib"),
+				filepath.Join(strings.TrimSpace(string(output)), "Toolchains/XcodeDefault.xctoolchain/usr/lib/libclang.dylib"))
+		}
+		paths = append(paths, "/opt/homebrew/opt/llvm/lib/libclang.dylib", "/usr/local/opt/llvm/lib/libclang.dylib", "libclang.dylib")
+	} else if programFiles := os.Getenv("ProgramFiles"); programFiles != "" {
+		paths = append(paths, filepath.Join(programFiles, "LLVM", "bin", "libclang.dll"))
 	}
-	paths = append(paths, "/opt/homebrew/opt/llvm/lib/libclang.dylib", "/usr/local/opt/llvm/lib/libclang.dylib", "libclang.dylib")
 	for _, path := range paths {
 		if path == "" {
 			continue

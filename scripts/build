@@ -1,11 +1,19 @@
 #!/bin/sh
 set -eu
 cd "$(dirname "$0")/.."
-test "$(go env GOOS)" = darwin
-package=build/install/scryer-cpp-engine
+platform=$(go env GOOS)
+arch=$(go env GOARCH)
+version=${SCRYER_ENGINE_VERSION:-0.0.0-dev}
+case "$version" in *[!0-9A-Za-z.-]*|'') exit 2 ;; esac
+case "$platform" in
+  darwin) library=libscryer-cpp-engine.dylib; extension=dylib ;;
+  windows) library=scryer-cpp-engine.dll; extension=dll ;;
+  *) echo "Unsupported C++ engine build platform: $platform" >&2; exit 1 ;;
+esac
+package=${SCRYER_ENGINE_PACKAGE:-build/install/scryer-cpp-engine}
 mkdir -p "$package/bin"
-CGO_ENABLED=1 go build -trimpath -buildmode=c-shared -o "$package/bin/libscryer-cpp-engine.dylib" ./cmd/cpp-engine-abi
-rm -f "$package/bin/libscryer-cpp-engine.h"
+CGO_ENABLED=1 go build -trimpath -buildmode=c-shared -o "$package/bin/$library" ./cmd/cpp-engine-abi
+rm -f "$package/bin/${library%.$extension}.h"
 cat > "$package/engine.json" <<MANIFEST
 {
   "schemaVersion": 1,
@@ -13,7 +21,7 @@ cat > "$package/engine.json" <<MANIFEST
     "protocolVersion": 1,
     "id": "cpp",
     "name": "Scryer C++ Engine",
-    "version": "0.0.0-dev",
+    "version": "$version",
     "source": "github.com/scryer-labs/scryer-cpp-engine",
     "mock": false
   },
@@ -23,9 +31,9 @@ cat > "$package/engine.json" <<MANIFEST
     "scanFacts": ["dependencies", "architecture", "files", "call-graph", "ipc"],
     "resolveFacts": ["files", "call-graph"]
   },
-  "library": "bin/libscryer-cpp-engine.dylib",
-  "os": "darwin",
-  "arch": "$(go env GOARCH)"
+  "library": "bin/$library",
+  "os": "$platform",
+  "arch": "$arch"
 }
 MANIFEST
 cp LICENSE "$package/"
