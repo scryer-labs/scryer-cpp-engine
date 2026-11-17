@@ -1,11 +1,11 @@
-package clangscan
+package process
 
 import (
 	"os/exec"
 	"strconv"
 )
 
-func configureCancellation(cmd *exec.Cmd) {
+func ConfigureCancellation(cmd *exec.Cmd) {
 	cmd.Cancel = func() error {
 		return exec.Command("taskkill.exe", "/PID", strconv.Itoa(cmd.Process.Pid), "/T", "/F").Run()
 	}

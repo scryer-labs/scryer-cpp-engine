@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/scryer-labs/scryer-cpp-engine/internal/process"
 )
 
 const databaseName = "compile_commands.json"
@@ -133,7 +135,7 @@ func configure(ctx context.Context, root, directory string) error {
 	}
 	cmd := exec.CommandContext(ctx, "cmake", "-S", root, "-B", directory, "-G", generator, "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON")
 	cmd.Dir = directory
-	configureCancellation(cmd)
+	process.ConfigureCancellation(cmd)
 	cmd.WaitDelay = 3 * time.Second
 	log := &tailBuffer{}
 	cmd.Stdout, cmd.Stderr = log, log
