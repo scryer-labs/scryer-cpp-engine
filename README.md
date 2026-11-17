@@ -143,6 +143,19 @@ declared source membership. Include `architecture` to get the component table. T
 source and access capabilities. Actual memory reads and writes require
 runtime evidence.
 
+## Runtime coverage
+
+The engine accepts LLVM v2 and v3 coverage JSON through Core's coverage operation:
+
+```sh
+scryer project analyze . --operations coverage --coverage-file /path/to/llvm-cov.json --json
+```
+
+Generate the export from an instrumented build and its execution profile
+using [llvm-cov export](https://llvm.org/docs/CommandGuide/llvm-cov.html#export-command).
+The operation imports file summaries and source segments under the project
+root. It records the artifact hash and keeps the evidence at aggregate
+granularity. Imported paths alone do not verify a source revision.
 ## Release verification
 
 The [GitHub workflow](.github/workflows/ci.yml) builds the platform packages

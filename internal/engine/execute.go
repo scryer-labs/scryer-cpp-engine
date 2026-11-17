@@ -10,6 +10,7 @@ import (
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/cmake"
+	"github.com/scryer-labs/scryer-cpp-engine/internal/coverage"
 )
 
 const (
@@ -28,6 +29,10 @@ type Request struct {
 		CompileCommands string   `json:"compileCommands"`
 		Facts           []string `json:"facts"`
 	} `json:"scan"`
+	Coverage struct {
+		Repository string `json:"repository"`
+		Artifact   string `json:"artifact"`
+	} `json:"coverage"`
 }
 
 func ParseRequest(data []byte) (Request, error) {
@@ -50,24 +55,32 @@ type report struct {
 }
 
 func (r Request) Execute(ctx context.Context) ([]byte, error) {
-	result, failure := r.scan(ctx)
+	var result any
+	var failure *protocolError
+	switch {
+	case r.ProtocolVersion != 1 || r.Stack != "cpp":
+		failure = &protocolError{"INVALID_REQUEST", "unsupported protocol version or stack"}
+	case r.Operation == "scan":
+		result, failure = r.scan(ctx)
+	case r.Operation == "coverage":
+		result, failure = r.collectCoverage(ctx)
+	default:
+		failure = &protocolError{"UNSUPPORTED_OPERATION", "C++ engine does not support operation " + r.Operation}
+	}
+	if failure != nil {
+		result = nil
+	}
 	return json.Marshal(struct {
 		ProtocolVersion int            `json:"protocolVersion"`
 		ID              string         `json:"requestId"`
 		Stack           string         `json:"stack"`
 		Operation       string         `json:"operation"`
-		Report          *report        `json:"report"`
+		Report          any            `json:"report"`
 		Error           *protocolError `json:"error"`
 	}{1, r.ID, "cpp", r.Operation, result, failure})
 }
 
 func (r Request) scan(ctx context.Context) (*report, *protocolError) {
-	if r.ProtocolVersion != 1 || r.Stack != "cpp" {
-		return nil, &protocolError{"INVALID_REQUEST", "unsupported protocol version or stack"}
-	}
-	if r.Operation != "scan" {
-		return nil, &protocolError{"UNSUPPORTED_OPERATION", "C++ engine does not support operation " + r.Operation}
-	}
 	selected := r.Scan.Facts
 	if len(selected) == 0 {
 		selected = []string{"dependencies"}
@@ -134,4 +147,23 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		}
 	}
 	return &report{1, root, facts}, nil
+}
+
+func (r Request) collectCoverage(ctx context.Context) (any, *protocolError) {
+	root, artifact := r.Coverage.Repository, r.Coverage.Artifact
+	if !filepath.IsAbs(root) || !filepath.IsAbs(artifact) {
+		return nil, &protocolError{"INVALID_REQUEST", "coverage requires absolute project and artifact paths"}
+	}
+	if info, err := os.Stat(root); err != nil || !info.IsDir() {
+		return nil, &protocolError{"INVALID_REQUEST", "coverage project must be an existing directory"}
+	}
+	evidence, err := coverage.ImportLLVM(ctx, root, artifact)
+	if err != nil {
+		return nil, &protocolError{"CPP_COVERAGE_ERROR", err.Error()}
+	}
+	return struct {
+		SchemaVersion int               `json:"schemaVersion"`
+		Root          string            `json:"root"`
+		Evidence      coverage.Evidence `json:"coverage"`
+	}{1, root, evidence}, nil
 }
