@@ -145,17 +145,21 @@ runtime evidence.
 
 ## Runtime coverage
 
-The engine accepts LLVM v2 and v3 coverage JSON through Core's coverage operation:
+On macOS, automatic coverage uses CMake, Apple Clang, and the matching
+LLVM tools from `xcrun`. The engine creates a temporary instrumented Debug
+build, runs CTest or specified executables, merges raw profiles, and reads
+the LLVM export.
 
 ```sh
+scryer project analyze . --operations coverage --json
+scryer project analyze . --operations coverage --test-binary tests/unit,tests/integration --json
 scryer project analyze . --operations coverage --coverage-file /path/to/llvm-cov.json --json
 ```
 
-Generate the export from an instrumented build and its execution profile
-using [llvm-cov export](https://llvm.org/docs/CommandGuide/llvm-cov.html#export-command).
-The operation imports file summaries and source segments under the project
-root. It records the artifact hash and keeps the evidence at aggregate
-granularity. Imported paths alone do not verify a source revision.
+The last command imports an existing v2 or v3
+[llvm-cov export](https://llvm.org/docs/CommandGuide/llvm-cov.html#export-command).
+Both paths report aggregate source evidence with an artifact hash. File paths
+and an artifact hash do not identify a source revision.
 ## Release verification
 
 The [GitHub workflow](.github/workflows/ci.yml) builds the platform packages

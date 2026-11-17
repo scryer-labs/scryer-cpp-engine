@@ -30,8 +30,9 @@ type Request struct {
 		Facts           []string `json:"facts"`
 	} `json:"scan"`
 	Coverage struct {
-		Repository string `json:"repository"`
-		Artifact   string `json:"artifact"`
+		Repository   string   `json:"repository"`
+		Artifact     string   `json:"artifact"`
+		TestBinaries []string `json:"testBinaries"`
 	} `json:"coverage"`
 }
 
@@ -151,19 +152,30 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 
 func (r Request) collectCoverage(ctx context.Context) (any, *protocolError) {
 	root, artifact := r.Coverage.Repository, r.Coverage.Artifact
-	if !filepath.IsAbs(root) || !filepath.IsAbs(artifact) {
+	if !filepath.IsAbs(root) || (artifact != "" && !filepath.IsAbs(artifact)) {
 		return nil, &protocolError{"INVALID_REQUEST", "coverage requires absolute project and artifact paths"}
 	}
 	if info, err := os.Stat(root); err != nil || !info.IsDir() {
 		return nil, &protocolError{"INVALID_REQUEST", "coverage project must be an existing directory"}
 	}
-	evidence, err := coverage.ImportLLVM(ctx, root, artifact)
+	if artifact != "" && len(r.Coverage.TestBinaries) != 0 {
+		return nil, &protocolError{"INVALID_REQUEST", "select artifact import or test binaries"}
+	}
+	var result coverage.Collection
+	var err error
+	if artifact == "" {
+		result, err = coverage.Collect(ctx, root, r.Coverage.TestBinaries)
+	} else {
+		var evidence coverage.Evidence
+		evidence, err = coverage.ImportLLVM(ctx, root, artifact)
+		result = coverage.Collection{Status: "collected", Evidence: &evidence}
+	}
 	if err != nil {
 		return nil, &protocolError{"CPP_COVERAGE_ERROR", err.Error()}
 	}
 	return struct {
-		SchemaVersion int               `json:"schemaVersion"`
-		Root          string            `json:"root"`
-		Evidence      coverage.Evidence `json:"coverage"`
-	}{1, root, evidence}, nil
+		SchemaVersion int    `json:"schemaVersion"`
+		Root          string `json:"root"`
+		coverage.Collection
+	}{1, root, result}, nil
 }
