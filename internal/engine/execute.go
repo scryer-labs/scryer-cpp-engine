@@ -33,6 +33,7 @@ type Request struct {
 		Repository   string   `json:"repository"`
 		Artifact     string   `json:"artifact"`
 		TestBinaries []string `json:"testBinaries"`
+		TestTargets  []string `json:"testTargets"`
 	} `json:"coverage"`
 }
 
@@ -158,13 +159,15 @@ func (r Request) collectCoverage(ctx context.Context) (any, *protocolError) {
 	if info, err := os.Stat(root); err != nil || !info.IsDir() {
 		return nil, &protocolError{"INVALID_REQUEST", "coverage project must be an existing directory"}
 	}
-	if artifact != "" && len(r.Coverage.TestBinaries) != 0 {
-		return nil, &protocolError{"INVALID_REQUEST", "select artifact import or test binaries"}
+	binaries, targets := r.Coverage.TestBinaries, r.Coverage.TestTargets
+	hasTests := len(binaries) != 0 || len(targets) != 0
+	if artifact != "" && hasTests || len(binaries) != 0 && len(targets) != 0 {
+		return nil, &protocolError{"INVALID_REQUEST", "select one of artifact import, test binaries, or CMake test targets"}
 	}
 	var result coverage.Collection
 	var err error
 	if artifact == "" {
-		result, err = coverage.Collect(ctx, root, r.Coverage.TestBinaries)
+		result, err = coverage.Collect(ctx, root, binaries, targets)
 	} else {
 		var evidence coverage.Evidence
 		evidence, err = coverage.ImportLLVM(ctx, root, artifact)

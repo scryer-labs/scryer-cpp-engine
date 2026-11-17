@@ -147,15 +147,18 @@ runtime evidence.
 
 On macOS, automatic coverage uses CMake, Apple Clang, and the matching
 LLVM tools from `xcrun`. The engine creates a temporary instrumented Debug
-build, runs CTest or specified executables, merges raw profiles, and reads
+build, runs CTest or selected executables, merges raw profiles, and reads
 the LLVM export.
 
 ```sh
 scryer project analyze . --operations coverage --json
+scryer project analyze . --operations coverage --test-target unit_tests,integration_tests --json
 scryer project analyze . --operations coverage --test-binary tests/unit,tests/integration --json
 scryer project analyze . --operations coverage --coverage-file /path/to/llvm-cov.json --json
 ```
 
+`--test-target` builds and runs CMake executable targets by name.
+Paths passed to `--test-binary` start at the temporary build directory.
 The last command imports an existing v2 or v3
 [llvm-cov export](https://llvm.org/docs/CommandGuide/llvm-cov.html#export-command).
 Both paths report aggregate source evidence with an artifact hash. File paths

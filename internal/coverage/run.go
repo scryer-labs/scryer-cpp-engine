@@ -31,7 +31,7 @@ type Collection struct {
 	Evidence *Evidence `json:"coverage,omitempty"`
 }
 
-func Collect(ctx context.Context, root string, testBinaries []string) (Collection, error) {
+func Collect(ctx context.Context, root string, testBinaries, testTargets []string) (Collection, error) {
 	if runtime.GOOS != "darwin" {
 		return Collection{}, fmt.Errorf("automatic C++ coverage currently requires macOS; use --coverage-file to import existing evidence")
 	}
@@ -80,14 +80,28 @@ func Collect(ctx context.Context, root string, testBinaries []string) (Collectio
 	if err := command(ctx, build, "", nil, "cmake", configure...); err != nil {
 		return Collection{}, fmt.Errorf("configure coverage build: %w", err)
 	}
-	if err := command(ctx, build, "", nil, "cmake", "--build", build, "--parallel"); err != nil {
+	targets, err := readCodeModel(ctx, build)
+	if err != nil {
+		return Collection{}, fmt.Errorf("read coverage build targets: %w", err)
+	}
+	buildArgs := []string{"--build", build, "--parallel"}
+	testNames := testBinaries
+	if len(testTargets) != 0 {
+		testBinaries, err = selectedTargetPaths(targets, testTargets)
+		if err != nil {
+			return Collection{}, err
+		}
+		testNames = testTargets
+		buildArgs = append(append(buildArgs, "--target"), testTargets...)
+	}
+	if err := command(ctx, build, "", nil, "cmake", buildArgs...); err != nil {
 		return Collection{}, fmt.Errorf("build with coverage instrumentation: %w", err)
 	}
 	var binaries []string
 	for _, relative := range testBinaries {
 		path, err := buildArtifact(build, relative)
 		if err != nil {
-			return Collection{}, fmt.Errorf("find test binary %q: %w", relative, err)
+			return Collection{}, fmt.Errorf("find test binary %q relative to the temporary coverage build directory: %w; use --test-target to select a CMake executable by name", relative, err)
 		}
 		for _, previous := range binaries {
 			if previous == path {
@@ -96,14 +110,14 @@ func Collect(ctx context.Context, root string, testBinaries []string) (Collectio
 		}
 		binaries = append(binaries, path)
 	}
-	runs, profiles, err := runTests(ctx, absoluteWork, build, testBinaries, binaries)
+	runs, profiles, err := runTests(ctx, absoluteWork, build, testNames, binaries)
 	if err != nil {
 		return Collection{}, err
 	}
 	if len(profiles) == 0 {
 		return Collection{Status: "unavailable", Message: "No test execution produced coverage profiles.", Runs: runs}, nil
 	}
-	objects, err := coverageObjects(ctx, build, binaries)
+	objects, err := coverageObjects(build, targets, binaries)
 	if err != nil {
 		return Collection{}, fmt.Errorf("find coverage objects: %w", err)
 	}

@@ -28,6 +28,7 @@ cat > "$package/engine.json" <<MANIFEST
   "capabilities": {
     "languages": ["C++"],
     "operations": ["scan", "coverage"],
+    "coverageTestTargets": true,
     "scanFacts": ["dependencies", "architecture", "files", "call-graph", "ipc"],
     "resolveFacts": ["files", "call-graph"]
   },
