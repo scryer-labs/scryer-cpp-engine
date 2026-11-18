@@ -16,7 +16,7 @@ func Test_should_preserve_cpp_correspondence_when_comments_and_offsets_change(t 
 		if err := os.WriteFile(file, []byte(source), 0600); err != nil {
 			t.Fatal(err)
 		}
-		result, err := collectImpactSnapshot(context.Background(), root)
+		result, err := collectImpactSnapshot(context.Background(), root, false)
 		if err != nil {
 			t.Fatal(err)
 		}

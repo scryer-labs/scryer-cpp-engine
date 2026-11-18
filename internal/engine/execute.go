@@ -28,12 +28,14 @@ type Request struct {
 		Static          *bool    `json:"static"`
 		CompileCommands string   `json:"compileCommands"`
 		Facts           []string `json:"facts"`
+		forImpact       bool
 	} `json:"scan"`
 	Impact struct {
 		Before     string `json:"before"`
 		After      string `json:"after"`
 		BeforeRoot string `json:"beforeRoot"`
 		AfterRoot  string `json:"afterRoot"`
+		Resolve    bool   `json:"resolve"`
 	} `json:"impact"`
 	Coverage struct {
 		Repository   string   `json:"repository"`
@@ -57,9 +59,10 @@ type protocolError struct {
 }
 
 type report struct {
-	SchemaVersion int            `json:"schemaVersion"`
-	Root          string         `json:"root"`
-	Facts         map[string]any `json:"facts"`
+	impactContexts []impactContext
+	SchemaVersion  int            `json:"schemaVersion"`
+	Root           string         `json:"root"`
+	Facts          map[string]any `json:"facts"`
 }
 
 func (r Request) Execute(ctx context.Context) ([]byte, error) {
@@ -122,15 +125,17 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		}
 	}
 
+	var contexts []impactContext
 	facts := make(map[string]any, len(selected))
 	if architectureRequested {
 		facts["architecture"] = describeArchitecture(root, buildFacts)
 	}
 	if filesRequested || dependenciesRequested || callsRequested || ipcRequested {
-		sources, err := scanSources(ctx, root, filesRequested || dependenciesRequested, callsRequested, ipcRequested, false)
+		sources, err := scanSources(ctx, root, filesRequested || dependenciesRequested, callsRequested, ipcRequested, r.Scan.forImpact)
 		if err != nil {
 			return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
 		}
+		contexts = sources.impactContexts
 		if ipcRequested {
 			ipcFacts := sources.ipc.Facts()
 			attachIPCComponents(&ipcFacts, buildFacts)
@@ -156,7 +161,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 			facts["call-graph"] = sources.graph
 		}
 	}
-	return &report{1, root, facts}, nil
+	return &report{SchemaVersion: 1, Root: root, Facts: facts, impactContexts: contexts}, nil
 }
 
 func (r Request) collectCoverage(ctx context.Context) (any, *protocolError) {
