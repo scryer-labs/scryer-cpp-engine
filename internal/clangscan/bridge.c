@@ -127,6 +127,8 @@ static unsigned visit_cursor(CXCursor cursor, CXCursor parent, void *opaque) {
     ScryerClang *api = visitor->api;
     if (scryerClangCancelled(visitor->handle)) return 0;
     const unsigned call = 103, inclusion = 503;
+    // Public CXCursorKind values: TypeRef, TemplateRef, DeclRefExpr, MemberRefExpr.
+    int reference = cursor.kind == 43 || cursor.kind == 45 || cursor.kind == 101 || cursor.kind == 102;
     CXFile source = NULL;
     unsigned line = 0, column = 0;
     api->fileLocation(api->cursorLocation(cursor), &source, &line, &column, NULL);
@@ -145,7 +147,7 @@ static unsigned visit_cursor(CXCursor cursor, CXCursor parent, void *opaque) {
         api->disposeString(usr);
         api->disposeString(name);
     }
-    if ((cursor.kind == call && visitor->calls) || (cursor.kind == inclusion && visitor->includes)) {
+    if ((cursor.kind == call && visitor->calls) || (cursor.kind == inclusion && visitor->includes) || (reference && visitor->calls)) {
         CXFile target = NULL;
         unsigned target_line = 0, target_column = 0;
         int is_definition = 0;
@@ -161,9 +163,10 @@ static unsigned visit_cursor(CXCursor cursor, CXCursor parent, void *opaque) {
         }
         if (target) {
             CXString target_name = api->fileName(target);
-            CXString name = api->spelling(cursor.kind == call ? ref : cursor);
+            CXString name = api->spelling(cursor.kind == inclusion ? cursor : ref);
             CXString usr = api->usr(ref);
-            scryerClangEdge(visitor->handle, cursor.kind, (char *)file, line, column,
+            if (!reference || scryerClangLocal(visitor->handle, (char *)api->cstring(target_name)))
+                scryerClangEdge(visitor->handle, cursor.kind, (char *)file, line, column,
                             (char *)api->cstring(target_name), target_line, target_column, is_definition,
                             (char *)api->cstring(name), (char *)api->cstring(usr));
             api->disposeString(usr);

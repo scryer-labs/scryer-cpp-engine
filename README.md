@@ -69,7 +69,13 @@ outside this static resolution.
 project-relative paths and one-based line/byte-column ranges (end exclusive).
 Calls include the enclosing symbol when one is visible. A unique exact spelling
 in the scanned definitions can appear as a candidate. With `--resolve`, semantic
-edges can link `callSiteId`, `callerSymbolId` and `targetSymbolId` when compiler
+The symbol table also preserves initialized variable templates as declaration
+nodes and marks explicit `consteval` functions with `executionKind: "compile-time"`.
+Semantic declaration/type references are retained in `semantic.references[]`,
+separately from calls in `semantic.edges[]`. These can preserve dependencies
+through variable-template instantiations and unevaluated `decltype` expressions.
+Instantiations share a source node, so their dependency union is conservative.
+Semantic edges can link `callSiteId`, `callerSymbolId` and `targetSymbolId` when compiler
 evidence and source locations allow.
 
 Request all three views with `--facts architecture,files,call-graph`. The project
@@ -179,7 +185,9 @@ changes appear as removal and addition. Ambiguous identities and changes outside
 function definitions stay unresolved. Candidate edges express potential
 connections. Without test selection, impact reuses static scan collection. Selecting
 `--test-target` or `--test-binary` reuses scan's compiler-resolution path and
-after-snapshot coverage. Dynamic failures stop analysis and produce no static
+after-snapshot coverage. Runtime coverage is `NOT_APPLICABLE` for immediate
+functions and variable-template declaration nodes; their references do not prove
+runtime execution or constant evaluation. Dynamic failures stop analysis and produce no static
 replacement. The shared resolver joins cross-unit definitions by compiler USR.
 See the [impact contract](https://github.com/scryer-labs/scryer/blob/main/docs/contracts/IMPACT.md).
 

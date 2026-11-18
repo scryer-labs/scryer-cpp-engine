@@ -38,3 +38,27 @@ func Test_should_preserve_cpp_correspondence_when_comments_and_offsets_change(t 
 		t.Fatal("body modification must change fingerprint while retaining correspondence")
 	}
 }
+
+func Test_should_preserve_variable_template_owners_and_immediate_function_semantics(t *testing.T) {
+	root := t.TempDir()
+	file := filepath.Join(root, "traits.h")
+	source := `namespace demo {
+ template<class T> struct Trait { consteval bool operator()() { return true; } };
+ template<class T> inline constexpr auto value = Trait<T>()();
+ constexpr int runtime_capable() { return 1; }
+}`
+	if err := os.WriteFile(file, []byte(source), 0600); err != nil {
+		t.Fatal(err)
+	}
+	facts, err := collectImpactSnapshot(context.Background(), root, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := map[string]string{}
+	for _, symbol := range facts.Symbols {
+		kinds[symbol.Signature] = symbol.ExecutionKind
+	}
+	if len(kinds) != 3 || kinds["demo::Trait::operator()()"] != "compile-time" || kinds["demo::value"] != "declaration" || kinds["demo::runtime_capable()"] != "" {
+		t.Fatalf("incorrect execution semantics: %#v", kinds)
+	}
+}

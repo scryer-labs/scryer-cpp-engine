@@ -14,14 +14,15 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-// Impact supplies syntax observations. Core owns comparison and graph traversal.
+// Impact projects the shared scan evidence. Core owns comparison and graph traversal.
 type impactSymbol struct {
-	ID          string      `json:"id"`
-	Key         string      `json:"key"`
-	Signature   string      `json:"signature"`
-	Fingerprint string      `json:"fingerprint"`
-	Source      string      `json:"source"`
-	Location    sourceRange `json:"location"`
+	ExecutionKind string      `json:"executionKind,omitempty"`
+	ID            string      `json:"id"`
+	Key           string      `json:"key"`
+	Signature     string      `json:"signature"`
+	Fingerprint   string      `json:"fingerprint"`
+	Source        string      `json:"source"`
+	Location      sourceRange `json:"location"`
 }
 
 type impactContext struct {
@@ -30,6 +31,7 @@ type impactContext struct {
 }
 
 type impactCall struct {
+	Kind       string      `json:"kind,omitempty"`
 	ID         string      `json:"callSiteId"`
 	Caller     string      `json:"callerSymbolId,omitempty"`
 	Candidate  string      `json:"candidateSymbolId,omitempty"`
@@ -67,7 +69,7 @@ func tokenText(node *sitter.Node, source []byte, outsideFunctions bool) string {
 }
 
 func impactIdentity(node *sitter.Node, file string, source []byte) (string, string, string) {
-	if node.Kind() != "function_definition" || node.HasError() {
+	if (node.Kind() != "function_definition" && templateVariableName(node) == nil) || node.HasError() {
 		return "", "", ""
 	}
 	declarator := node.ChildByFieldName("declarator")
@@ -89,9 +91,13 @@ func impactIdentity(node *sitter.Node, file string, source []byte) (string, stri
 	if signature != "" {
 		signature += "::"
 	}
-	signature += declarator.Utf8Text(source)
+	identityDeclarator := declarator
+	if templateVariableName(node) != nil {
+		identityDeclarator = templateVariableName(node)
+	}
+	signature += identityDeclarator.Utf8Text(source)
 	scopeJSON, _ := json.Marshal(scope)
-	key := file + "|" + string(scopeJSON) + "|" + tokenText(declarator, source, false)
+	key := file + "|" + string(scopeJSON) + "|" + tokenText(identityDeclarator, source, false)
 	return key, signature, fmt.Sprintf("%x", sha256.Sum256([]byte(tokenText(node, source, false))))
 }
 
@@ -122,7 +128,7 @@ func collectImpactSnapshot(ctx context.Context, root string, resolve bool) (impa
 		Symbols: []impactSymbol{}, Calls: []impactCall{}, Contexts: scanned.impactContexts,
 		Notes: []string{
 			"Syntax-only C++ impact. Name candidates are potential links, without compiler name or overload resolution.",
-			"Only function definitions with an explicit declarator and named enclosing scopes receive comparison keys. Lambdas and parse errors remain outside symbol correspondence.",
+			"Named function definitions and initialized variable-template declarations receive comparison keys. Lambdas, anonymous scopes and parse errors remain outside symbol correspondence.",
 			"Header declarations, macros, global state, types, generated code, conditional build selection, virtual dispatch and dynamic calls may affect unchanged functions beyond this graph.",
 			"Source paths and declaration tokens identify correspondence within each file. Signature changes and file renames appear as removals and additions.",
 		},
@@ -132,18 +138,21 @@ func collectImpactSnapshot(ctx context.Context, root string, resolve bool) (impa
 			continue
 		}
 		result.Symbols = append(result.Symbols, impactSymbol{
-			ID: symbol.ID, Key: symbol.impactKey, Signature: symbol.impactSignature,
+			ExecutionKind: symbol.ExecutionKind, ID: symbol.ID, Key: symbol.impactKey, Signature: symbol.impactSignature,
 			Fingerprint: symbol.impactFingerprint, Source: symbol.impactSource, Location: symbol.Definition,
 		})
 	}
 	if resolve {
 		result.Resolution = graph.Semantic.Resolution
-		result.Notes[0] = "Compiler-resolved scan evidence. Unresolved or non-runtime template dependencies remain explicit."
+		result.Notes[0] = "Compiler-resolved calls and declaration/type references from scan. Variable-template instantiations share a source declaration node; their dependency union is conservative, not a per-instantiation runtime path."
 		seenSites := map[string]bool{}
-		for _, edge := range graph.Semantic.Edges {
+		edges := append(append([]semanticCallEdge{}, graph.Semantic.Edges...), graph.Semantic.References...)
+		for _, edge := range edges {
 			site := sourceRange{File: edge.Site.File, Start: position{Line: edge.Site.Line, Column: edge.Site.Column}, End: position{Line: edge.Site.Line, Column: edge.Site.Column + 1}}
-			result.Calls = append(result.Calls, impactCall{ID: edge.ID, Caller: edge.CallerSymbolID, Target: edge.TargetSymbolID, Callee: edge.Name, Resolution: "compiler-" + edge.TargetKind, Site: site})
-			seenSites[edge.CallSiteID] = true
+			result.Calls = append(result.Calls, impactCall{Kind: edge.Kind, ID: edge.ID, Caller: edge.CallerSymbolID, Target: edge.TargetSymbolID, Callee: edge.Name, Resolution: "compiler-" + edge.TargetKind, Site: site})
+			if edge.Kind == "call" {
+				seenSites[edge.CallSiteID] = true
+			}
 		}
 		for _, call := range graph.Calls {
 			if !seenSites[call.ID] {

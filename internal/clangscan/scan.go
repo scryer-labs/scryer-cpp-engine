@@ -24,6 +24,7 @@ type Location struct {
 }
 
 type Edge struct {
+	Kind       string   `json:"kind,omitempty"`
 	TargetKind string   `json:"targetKind"`
 	Unit       string   `json:"unit"`
 	Site       Location `json:"site"`
@@ -58,16 +59,17 @@ type Result struct {
 	FilesWithoutCommands []string     `json:"filesWithoutCommands,omitempty"`
 	Includes             []Edge       `json:"-"`
 	Calls                []Edge       `json:"-"`
+	References           []Edge       `json:"-"`
 }
 
 type unitState struct {
-	definitions     []Definition
-	ctx             context.Context
-	root            string
-	directory       string
-	unit            Unit
-	sources         map[string]bool
-	includes, calls []Edge
+	definitions                 []Definition
+	ctx                         context.Context
+	root                        string
+	directory                   string
+	unit                        Unit
+	sources                     map[string]bool
+	includes, calls, references []Edge
 }
 
 func (s *unitState) path(file string) string {
@@ -150,6 +152,7 @@ func Resolve(ctx context.Context, root, explicit string, files []string, include
 			}
 			result.Includes = append(result.Includes, state.includes...)
 			result.Calls = append(result.Calls, state.calls...)
+			result.References = append(result.References, state.references...)
 			result.Definitions = append(result.Definitions, state.definitions...)
 		}
 		result.Units = append(result.Units, state.unit)

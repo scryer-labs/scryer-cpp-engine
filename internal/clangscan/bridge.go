@@ -114,7 +114,16 @@ func scryerClangEdge(handle C.uintptr_t, kind C.uint, file *C.char, line, column
 		if definition != 0 {
 			edge.TargetKind = "definition"
 		}
-		state.calls = append(state.calls, edge)
+		if kind == 103 {
+			edge.Kind = "call"
+			state.calls = append(state.calls, edge)
+		} else {
+			edge.Kind = "declaration-reference"
+			if kind == 43 || kind == 45 {
+				edge.Kind = "type-reference"
+			}
+			state.references = append(state.references, edge)
+		}
 	}
 }
 

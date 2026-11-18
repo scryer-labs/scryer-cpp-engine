@@ -27,6 +27,7 @@ type functionSymbol struct {
 	impactSignature   string
 	impactFingerprint string
 	impactSource      string
+	ExecutionKind     string `json:"executionKind,omitempty"`
 	ID                string `json:"symbolId"`
 	baseName          string
 	Name              string      `json:"name,omitempty"`
@@ -66,13 +67,20 @@ func (g *callGraph) collect(node *sitter.Node, file string, source []byte, scope
 		scopes = scopes[:len(scopes)-1]
 	}
 	switch node.Kind() {
-	case "function_definition", "lambda_expression":
+	case "function_definition", "lambda_expression", "declaration":
+		variable := templateVariableName(node)
+		if node.Kind() == "declaration" && variable == nil {
+			break
+		}
 		symbol := functionSymbol{
 			ID:         file + ":" + strconv.FormatUint(uint64(node.StartByte()), 10),
 			Kind:       "function",
 			Definition: location(file, node),
 		}
-		if node.Kind() == "lambda_expression" {
+		if variable != nil {
+			symbol.Kind, symbol.ExecutionKind = "variable-template", "declaration"
+			symbol.Name, symbol.baseName = variable.Utf8Text(source), variable.Utf8Text(source)
+		} else if node.Kind() == "lambda_expression" {
 			symbol.Kind = "lambda"
 		} else {
 			if name := functionName(node.ChildByFieldName("declarator")); name != nil {
@@ -81,6 +89,9 @@ func (g *callGraph) collect(node *sitter.Node, file string, source []byte, scope
 					symbol.baseName = leaf.Utf8Text(source)
 				}
 			}
+		}
+		if node.Kind() == "function_definition" && hasConsteval(node, source) {
+			symbol.ExecutionKind = "compile-time"
 		}
 		if g.withImpact {
 			symbol.impactKey, symbol.impactSignature, symbol.impactFingerprint = impactIdentity(node, file, source)
@@ -147,7 +158,7 @@ func terminalName(node *sitter.Node) *sitter.Node {
 func (g *callGraph) findCandidates() {
 	byName := make(map[string]string)
 	for _, symbol := range g.Symbols {
-		if symbol.Name == "" {
+		if symbol.Name == "" || symbol.Kind == "variable-template" {
 			continue
 		}
 		if _, exists := byName[symbol.Name]; exists {

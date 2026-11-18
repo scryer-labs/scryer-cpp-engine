@@ -18,6 +18,7 @@ type semanticCallEdge struct {
 }
 
 type semanticCallFacts struct {
+	References []semanticCallEdge `json:"references"`
 	Resolution *clangscan.Result  `json:"resolution"`
 	Edges      []semanticCallEdge `json:"edges"`
 }
@@ -65,8 +66,8 @@ func (index rangeIndex) visit(site clangscan.Location, match func(int)) {
 }
 
 func (g *callGraph) joinSemantic(result *clangscan.Result) {
-	g.Semantic = &semanticCallFacts{Resolution: result, Edges: make([]semanticCallEdge, 0, len(result.Calls))}
-	if len(result.Calls) == 0 {
+	g.Semantic = &semanticCallFacts{Resolution: result, Edges: make([]semanticCallEdge, 0, len(result.Calls)), References: []semanticCallEdge{}}
+	if len(result.Calls) == 0 && len(result.References) == 0 {
 		return
 	}
 	calls, symbols := rangeIndex{}, rangeIndex{}
@@ -94,25 +95,31 @@ func (g *callGraph) joinSemantic(result *clangscan.Result) {
 			definitions[definition.USR] = id
 		}
 	}
-	for i, fact := range result.Calls {
+	all := append(append([]clangscan.Edge{}, result.Calls...), result.References...)
+	for i, fact := range all {
+		if fact.Kind == "" {
+			fact.Kind = "call"
+		}
 		edge := semanticCallEdge{Edge: fact, ID: "clang:" + strconv.Itoa(i+1)}
 		point := position{Line: fact.Site.Line, Column: fact.Site.Column}
 		best, score, ambiguous := -1, 0, false
-		calls.visit(fact.Site, func(index int) {
-			call := g.Calls[index]
-			if call.name != fact.Name {
-				return
-			}
-			rank := 1
-			if comparePosition(call.nameRange.Start, point) <= 0 && comparePosition(point, call.nameRange.End) < 0 {
-				rank = 2
-			}
-			if rank > score {
-				best, score, ambiguous = index, rank, false
-			} else if rank == score {
-				ambiguous = true
-			}
-		})
+		if fact.Kind == "call" {
+			calls.visit(fact.Site, func(index int) {
+				call := g.Calls[index]
+				if call.name != fact.Name {
+					return
+				}
+				rank := 1
+				if comparePosition(call.nameRange.Start, point) <= 0 && comparePosition(point, call.nameRange.End) < 0 {
+					rank = 2
+				}
+				if rank > score {
+					best, score, ambiguous = index, rank, false
+				} else if rank == score {
+					ambiguous = true
+				}
+			})
+		}
 		if best >= 0 && !ambiguous {
 			call := &g.Calls[best]
 			call.SemanticEdgeIDs = append(call.SemanticEdgeIDs, edge.ID)
@@ -131,7 +138,11 @@ func (g *callGraph) joinSemantic(result *clangscan.Result) {
 				edge.Target = definitionLocations[edge.TargetSymbolID]
 			}
 		}
-		g.Semantic.Edges = append(g.Semantic.Edges, edge)
+		if fact.Kind == "call" {
+			g.Semantic.Edges = append(g.Semantic.Edges, edge)
+		} else {
+			g.Semantic.References = append(g.Semantic.References, edge)
+		}
 	}
 }
 
