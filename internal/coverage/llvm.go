@@ -23,7 +23,19 @@ type summary struct {
 	Regions   *count `json:"regions"`
 }
 
+type Position struct {
+	Line   uint `json:"line"`
+	Column uint `json:"column"`
+}
+
+type Region struct {
+	Start Position `json:"start"`
+	End   Position `json:"end"`
+	Count uint64   `json:"count"`
+}
+
 type File struct {
+	Regions  []Region        `json:"regions,omitempty"`
 	Path     string          `json:"path"`
 	Summary  summary         `json:"summary"`
 	Segments json.RawMessage `json:"llvmSegments,omitempty"`
@@ -117,10 +129,62 @@ func ImportLLVM(ctx context.Context, root, artifact string) (Evidence, error) {
 		if len(source.Segments) > 0 && source.Segments[0] != '[' {
 			return Evidence{}, fmt.Errorf("invalid coverage segments for %q", path)
 		}
-		result.Files = append(result.Files, File{Path: path, Summary: source.Summary, Segments: source.Segments})
+		regions, err := measuredRegions(source.Segments)
+		if err != nil {
+			return Evidence{}, fmt.Errorf("coverage regions for %s: %w", path, err)
+		}
+		result.Files = append(result.Files, File{Path: path, Summary: source.Summary, Segments: source.Segments, Regions: regions})
 	}
 	if excludedPaths {
 		result.Notes = append(result.Notes, "Coverage paths that could not be mapped to the project root were omitted.")
 	}
 	return result, nil
+}
+
+func measuredRegions(raw json.RawMessage) ([]Region, error) {
+	var segments [][]json.RawMessage
+	if err := json.Unmarshal(raw, &segments); err != nil {
+		return nil, err
+	}
+	type segment struct {
+		position Position
+		count    uint64
+		hasCount bool
+		gap      bool
+	}
+	points := make([]segment, len(segments))
+	for i, values := range segments {
+		if len(values) < 6 {
+			return nil, fmt.Errorf("expected an LLVM segment tuple")
+		}
+		point := &points[i]
+		fields := []struct {
+			value  json.RawMessage
+			target any
+		}{
+			{values[0], &point.position.Line}, {values[1], &point.position.Column},
+			{values[2], &point.count}, {values[3], &point.hasCount}, {values[5], &point.gap},
+		}
+		for _, field := range fields {
+			if err := json.Unmarshal(field.value, field.target); err != nil {
+				return nil, err
+			}
+		}
+		if point.position.Line == 0 || point.position.Column == 0 {
+			return nil, fmt.Errorf("invalid coverage position")
+		}
+		if i > 0 {
+			prior := points[i-1].position
+			if point.position.Line < prior.Line || point.position.Line == prior.Line && point.position.Column < prior.Column {
+				return nil, fmt.Errorf("coverage segments must be ordered")
+			}
+		}
+	}
+	regions := []Region{}
+	for i := 0; i+1 < len(points); i++ {
+		if points[i].hasCount && !points[i].gap && points[i].position != points[i+1].position {
+			regions = append(regions, Region{Start: points[i].position, End: points[i+1].position, Count: points[i].count})
+		}
+	}
+	return regions, nil
 }

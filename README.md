@@ -177,7 +177,8 @@ scryer project analyze . --stack cpp --json -o impact.html
 Comments and whitespace do not mark a function changed. File moves and signature
 changes appear as removal and addition. Ambiguous identities and changes outside
 function definitions stay unresolved. Candidate edges express potential
-connections. Coverage remains unknown in this static slice.
+connections. Core can reuse the coverage operation on the after snapshot to match observed
+source regions to affected symbols. Use `--skip-tests` for static impact only.
 See the [impact contract](https://github.com/scryer-labs/scryer/blob/main/docs/contracts/IMPACT.md).
 
 ## Release verification

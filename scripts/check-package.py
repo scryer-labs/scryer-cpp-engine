@@ -42,3 +42,28 @@ with tempfile.TemporaryDirectory() as directory:
         assert any(item["path"] == "main.cpp" for item in response["report"]["facts"]["files"]["files"])
     finally:
         library.release_buffer_v1(result.response)
+
+
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory).resolve()
+    before, after = root / "before", root / "after"
+    before.mkdir()
+    after.mkdir()
+    (before / "main.cpp").write_text("int changed() { return 1; }\n")
+    (after / "main.cpp").write_text("int changed() { return 2; }\n")
+    request = json.dumps({
+        "protocolVersion": 1, "requestId": "impact-package-check", "stack": "cpp",
+        "operation": "impact", "impact": {
+            "before": "a" * 40, "after": "b" * 40,
+            "beforeRoot": str(before), "afterRoot": str(after),
+        },
+    }).encode()
+    result = library.execute_v1(View(request, len(request)))
+    try:
+        response = json.loads(ctypes.string_at(result.response.data, result.response.size))
+        assert result.status == 0 and response["error"] is None, response
+        left = response["report"]["before"]["symbols"][0]
+        right = response["report"]["after"]["symbols"][0]
+        assert left["key"] == right["key"] and left["fingerprint"] != right["fingerprint"]
+    finally:
+        library.release_buffer_v1(result.response)
