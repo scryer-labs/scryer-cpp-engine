@@ -117,3 +117,16 @@ func scryerClangEdge(handle C.uintptr_t, kind C.uint, file *C.char, line, column
 		state.calls = append(state.calls, edge)
 	}
 }
+
+//export scryerClangDefinition
+func scryerClangDefinition(handle C.uintptr_t, file *C.char, line, column C.uint, name, usr *C.char) {
+	state := cgo.Handle(handle).Value().(*unitState)
+	identity := C.GoString(usr)
+	if identity == "" {
+		return
+	}
+	state.definitions = append(state.definitions, Definition{
+		USR: identity, Name: C.GoString(name),
+		Location: Location{File: state.path(C.GoString(file)), Line: uint(line), Column: uint(column)},
+	})
+}

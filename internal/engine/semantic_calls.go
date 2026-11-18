@@ -80,6 +80,20 @@ func (g *callGraph) joinSemantic(result *clangscan.Result) {
 	}
 	calls.prepare()
 	symbols.prepare()
+	definitions := map[string]string{}
+	definitionLocations := map[string]clangscan.Location{}
+	for _, definition := range result.Definitions {
+		id := g.enclosingSymbol(symbols, definition.Location, definition.Name)
+		if id == "" {
+			continue
+		}
+		definitionLocations[id] = definition.Location
+		if previous, exists := definitions[definition.USR]; exists && previous != id {
+			definitions[definition.USR] = ""
+		} else if !exists {
+			definitions[definition.USR] = id
+		}
+	}
 	for i, fact := range result.Calls {
 		edge := semanticCallEdge{Edge: fact, ID: "clang:" + strconv.Itoa(i+1)}
 		point := position{Line: fact.Site.Line, Column: fact.Site.Column}
@@ -109,6 +123,13 @@ func (g *callGraph) joinSemantic(result *clangscan.Result) {
 		}
 		if fact.TargetKind == "definition" {
 			edge.TargetSymbolID = g.enclosingSymbol(symbols, fact.Target, fact.Name)
+		}
+		if edge.TargetSymbolID == "" && fact.SymbolUSR != "" {
+			edge.TargetSymbolID = definitions[fact.SymbolUSR]
+			if edge.TargetSymbolID != "" {
+				edge.TargetKind = "definition"
+				edge.Target = definitionLocations[edge.TargetSymbolID]
+			}
 		}
 		g.Semantic.Edges = append(g.Semantic.Edges, edge)
 	}

@@ -51,6 +51,7 @@ struct ScryerClang {
     unsigned (*visit)(CXCursor, CXCursorVisitor, void *);
     CXCursor (*referenced)(CXCursor);
     CXCursor (*definition)(CXCursor);
+    unsigned (*isDefinition)(CXCursor);
     CXSourceLocation (*cursorLocation)(CXCursor);
     void (*fileLocation)(CXSourceLocation, CXFile *, unsigned *, unsigned *, unsigned *);
     CXFile (*includedFile)(CXCursor);
@@ -83,6 +84,7 @@ ScryerClang *scryer_clang_open(const char *path) {
     LOAD(visit, "clang_visitChildren");
     LOAD(referenced, "clang_getCursorReferenced");
     LOAD(definition, "clang_getCursorDefinition");
+    LOAD(isDefinition, "clang_isCursorDefinition");
     LOAD(cursorLocation, "clang_getCursorLocation");
     LOAD(fileLocation, "clang_getFileLocation");
     LOAD(includedFile, "clang_getIncludedFile");
@@ -107,6 +109,7 @@ extern int scryerClangCancelled(uintptr_t handle);
 extern int scryerClangLocal(uintptr_t handle, char *file);
 extern void scryerClangTarget(uintptr_t handle, char *triple);
 extern void scryerClangDiagnostic(uintptr_t handle, unsigned severity, char *message);
+extern void scryerClangDefinition(uintptr_t handle, char *file, unsigned line, unsigned column, char *name, char *usr);
 extern void scryerClangEdge(uintptr_t handle, unsigned kind, char *file,
                             unsigned line, unsigned column, char *target_file,
                             unsigned target_line, unsigned target_column, int definition,
@@ -133,6 +136,14 @@ static unsigned visit_cursor(CXCursor cursor, CXCursor parent, void *opaque) {
     if (!scryerClangLocal(visitor->handle, (char *)file)) {
         api->disposeString(source_name);
         return 1;
+    }
+    if (visitor->calls && api->isDefinition(cursor)) {
+        CXString name = api->spelling(cursor);
+        CXString usr = api->usr(cursor);
+        scryerClangDefinition(visitor->handle, (char *)file, line, column,
+                             (char *)api->cstring(name), (char *)api->cstring(usr));
+        api->disposeString(usr);
+        api->disposeString(name);
     }
     if ((cursor.kind == call && visitor->calls) || (cursor.kind == inclusion && visitor->includes)) {
         CXFile target = NULL;

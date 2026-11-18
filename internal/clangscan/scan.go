@@ -41,19 +41,27 @@ type Unit struct {
 	Diagnostics   []string `json:"diagnostics,omitempty"`
 }
 
+type Definition struct {
+	USR      string
+	Name     string
+	Location Location
+}
+
 type Result struct {
-	Status               string   `json:"status"`
-	Backend              string   `json:"backend"`
-	Database             string   `json:"database,omitempty"`
-	Library              string   `json:"library,omitempty"`
-	Message              string   `json:"message,omitempty"`
-	Units                []Unit   `json:"units"`
-	FilesWithoutCommands []string `json:"filesWithoutCommands,omitempty"`
-	Includes             []Edge   `json:"-"`
-	Calls                []Edge   `json:"-"`
+	Definitions          []Definition `json:"-"`
+	Status               string       `json:"status"`
+	Backend              string       `json:"backend"`
+	Database             string       `json:"database,omitempty"`
+	Library              string       `json:"library,omitempty"`
+	Message              string       `json:"message,omitempty"`
+	Units                []Unit       `json:"units"`
+	FilesWithoutCommands []string     `json:"filesWithoutCommands,omitempty"`
+	Includes             []Edge       `json:"-"`
+	Calls                []Edge       `json:"-"`
 }
 
 type unitState struct {
+	definitions     []Definition
 	ctx             context.Context
 	root            string
 	directory       string
@@ -142,6 +150,7 @@ func Resolve(ctx context.Context, root, explicit string, files []string, include
 			}
 			result.Includes = append(result.Includes, state.includes...)
 			result.Calls = append(result.Calls, state.calls...)
+			result.Definitions = append(result.Definitions, state.definitions...)
 		}
 		result.Units = append(result.Units, state.unit)
 	}
