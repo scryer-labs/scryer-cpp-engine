@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io/fs"
 	"os"
@@ -27,23 +28,24 @@ type semanticFacts struct {
 }
 
 type sourceFacts struct {
-	resolution *clangscan.Result
-	files      []string
-	includes   []Include
-	graph      callGraph
-	ipc        ipc.Collector
+	impactContexts []impactContext
+	resolution     *clangscan.Result
+	files          []string
+	includes       []Include
+	graph          callGraph
+	ipc            ipc.Collector
 }
 
-func scanSources(ctx context.Context, root string, includes, calls, ipcRequested bool) (sourceFacts, error) {
+func scanSources(ctx context.Context, root string, includes, calls, ipcRequested, impact bool) (sourceFacts, error) {
 	parser := sitter.NewParser()
 	defer parser.Close()
 	if err := parser.SetLanguage(sitter.NewLanguage(cpp.Language())); err != nil {
 		return sourceFacts{}, err
 	}
 
-	facts := sourceFacts{files: []string{}, includes: []Include{}}
+	facts := sourceFacts{files: []string{}, includes: []Include{}, impactContexts: []impactContext{}}
 	if calls {
-		facts.graph = callGraph{ProjectID: root, Basis: "tree-sitter-syntax", Symbols: []functionSymbol{}, Calls: []callSite{}}
+		facts.graph = callGraph{ProjectID: root, Basis: "tree-sitter-syntax", withImpact: impact, Symbols: []functionSymbol{}, Calls: []callSite{}}
 	}
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -85,6 +87,12 @@ func scanSources(ctx context.Context, root string, includes, calls, ipcRequested
 		}
 		if tree == nil {
 			return fmt.Errorf("could not parse %s", file)
+		}
+		if impact {
+			context := tokenText(tree.RootNode(), source, true)
+			if context != "" {
+				facts.impactContexts = append(facts.impactContexts, impactContext{Path: file, Fingerprint: fmt.Sprintf("%x", sha256.Sum256([]byte(context)))})
+			}
 		}
 		if includes || calls {
 			err = facts.collect(ctx, tree.RootNode(), file, source, includes, calls)

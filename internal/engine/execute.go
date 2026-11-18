@@ -29,6 +29,12 @@ type Request struct {
 		CompileCommands string   `json:"compileCommands"`
 		Facts           []string `json:"facts"`
 	} `json:"scan"`
+	Impact struct {
+		Before     string `json:"before"`
+		After      string `json:"after"`
+		BeforeRoot string `json:"beforeRoot"`
+		AfterRoot  string `json:"afterRoot"`
+	} `json:"impact"`
 	Coverage struct {
 		Repository   string   `json:"repository"`
 		Artifact     string   `json:"artifact"`
@@ -64,6 +70,8 @@ func (r Request) Execute(ctx context.Context) ([]byte, error) {
 		failure = &protocolError{"INVALID_REQUEST", "unsupported protocol version or stack"}
 	case r.Operation == "scan":
 		result, failure = r.scan(ctx)
+	case r.Operation == "impact":
+		result, failure = r.collectImpact(ctx)
 	case r.Operation == "coverage":
 		result, failure = r.collectCoverage(ctx)
 	default:
@@ -119,7 +127,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		facts["architecture"] = describeArchitecture(root, buildFacts)
 	}
 	if filesRequested || dependenciesRequested || callsRequested || ipcRequested {
-		sources, err := scanSources(ctx, root, filesRequested || dependenciesRequested, callsRequested, ipcRequested)
+		sources, err := scanSources(ctx, root, filesRequested || dependenciesRequested, callsRequested, ipcRequested, false)
 		if err != nil {
 			return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
 		}

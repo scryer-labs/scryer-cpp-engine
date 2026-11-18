@@ -163,6 +163,23 @@ The last command imports an existing v2 or v3
 [llvm-cov export](https://llvm.org/docs/CommandGuide/llvm-cov.html#export-command).
 Both paths report aggregate source evidence with an artifact hash. File paths
 and an artifact hash do not identify a source revision.
+## Static change impact
+
+The `impact` engine operation supplies function definitions, normalized
+declarator keys, token fingerprints, source ranges, and syntax call candidates
+for two immutable snapshots. Core owns the comparison, reachability traversal
+and report presentation.
+
+```sh
+scryer project analyze . --stack cpp --json -o impact.html
+```
+
+Comments and whitespace do not mark a function changed. File moves and signature
+changes appear as removal and addition. Ambiguous identities and changes outside
+function definitions stay unresolved. Candidate edges express potential
+connections. Coverage remains unknown in this static slice.
+See the [impact contract](https://github.com/scryer-labs/scryer/blob/main/docs/contracts/IMPACT.md).
+
 ## Release verification
 
 The [GitHub workflow](.github/workflows/ci.yml) builds the platform packages

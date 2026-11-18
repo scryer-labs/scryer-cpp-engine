@@ -23,11 +23,15 @@ func location(file string, node *sitter.Node) sourceRange {
 }
 
 type functionSymbol struct {
-	ID         string `json:"symbolId"`
-	baseName   string
-	Name       string      `json:"name,omitempty"`
-	Kind       string      `json:"kind"`
-	Definition sourceRange `json:"definition"`
+	impactKey         string
+	impactSignature   string
+	impactFingerprint string
+	impactSource      string
+	ID                string `json:"symbolId"`
+	baseName          string
+	Name              string      `json:"name,omitempty"`
+	Kind              string      `json:"kind"`
+	Definition        sourceRange `json:"definition"`
 }
 
 type callSite struct {
@@ -44,11 +48,12 @@ type callSite struct {
 }
 
 type callGraph struct {
-	Semantic  *semanticCallFacts `json:"semantic,omitempty"`
-	ProjectID string             `json:"projectId"`
-	Basis     string             `json:"basis"`
-	Symbols   []functionSymbol   `json:"symbols"`
-	Calls     []callSite         `json:"calls"`
+	withImpact bool
+	Semantic   *semanticCallFacts `json:"semantic,omitempty"`
+	ProjectID  string             `json:"projectId"`
+	Basis      string             `json:"basis"`
+	Symbols    []functionSymbol   `json:"symbols"`
+	Calls      []callSite         `json:"calls"`
 }
 
 type functionScope struct {
@@ -75,6 +80,12 @@ func (g *callGraph) collect(node *sitter.Node, file string, source []byte, scope
 				if leaf := terminalName(name); leaf != nil {
 					symbol.baseName = leaf.Utf8Text(source)
 				}
+			}
+		}
+		if g.withImpact {
+			symbol.impactKey, symbol.impactSignature, symbol.impactFingerprint = impactIdentity(node, file, source)
+			if symbol.impactKey != "" {
+				symbol.impactSource = node.Utf8Text(source)
 			}
 		}
 		g.Symbols = append(g.Symbols, symbol)
