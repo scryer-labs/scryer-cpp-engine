@@ -34,3 +34,17 @@ func Test_should_bind_a_cross_unit_call_when_clang_reports_a_declaration(t *test
 		t.Fatal("ambiguous compiler definitions must remain unresolved")
 	}
 }
+
+func Test_should_classify_only_macro_generated_registered_test_scopes(t *testing.T) {
+	graph := callGraph{Symbols: []functionSymbol{
+		{ID: "custom-macro", Name: "MY_SCENARIO", Kind: "function", Definition: sourceRange{File: "cases.cpp", Start: position{1, 1}, End: position{4, 2}}},
+		{ID: "helper", Name: "test_business", Kind: "function", Definition: sourceRange{File: "cases.cpp", Start: position{5, 1}, End: position{8, 2}}},
+	}}
+	registration := clangscan.Edge{Kind: "call", SymbolUSR: "c:@N@testing@N@internal@F@MakeAndRegisterTestInfo#arguments", Target: clangscan.Location{File: "/deps/gtest/internal/gtest-internal.h"}, Site: clangscan.Location{File: "cases.cpp", Line: 1, Column: 1}}
+	ordinary := registration
+	ordinary.Site = clangscan.Location{File: "cases.cpp", Line: 6, Column: 3}
+	graph.joinSemantic(&clangscan.Result{Calls: []clangscan.Edge{registration, ordinary}})
+	if graph.Symbols[0].Role != "TEST" || graph.Symbols[0].TestContext == nil || graph.Symbols[1].Role != "" {
+		t.Fatal("registration must mark only the proven macro scope, regardless of its spelling")
+	}
+}

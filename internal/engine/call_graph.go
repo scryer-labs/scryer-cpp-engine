@@ -3,6 +3,8 @@ package engine
 import (
 	"strconv"
 
+	"github.com/scryer-labs/scryer-cpp-engine/internal/testclassification"
+
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
@@ -23,6 +25,8 @@ func location(file string, node *sitter.Node) sourceRange {
 }
 
 type functionSymbol struct {
+	Role              string                      `json:"role,omitempty"`
+	TestContext       *testclassification.Context `json:"testContext,omitempty"`
 	impactKey         string
 	impactSignature   string
 	impactFingerprint string

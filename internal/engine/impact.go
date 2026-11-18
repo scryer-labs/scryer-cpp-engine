@@ -10,19 +10,22 @@ import (
 	"strings"
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
+	"github.com/scryer-labs/scryer-cpp-engine/internal/testclassification"
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
 // Impact projects the shared scan evidence. Core owns comparison and graph traversal.
 type impactSymbol struct {
-	ExecutionKind string      `json:"executionKind,omitempty"`
-	ID            string      `json:"id"`
-	Key           string      `json:"key"`
-	Signature     string      `json:"signature"`
-	Fingerprint   string      `json:"fingerprint"`
-	Source        string      `json:"source"`
-	Location      sourceRange `json:"location"`
+	Role          string                      `json:"role,omitempty"`
+	TestContext   *testclassification.Context `json:"testContext,omitempty"`
+	ExecutionKind string                      `json:"executionKind,omitempty"`
+	ID            string                      `json:"id"`
+	Key           string                      `json:"key"`
+	Signature     string                      `json:"signature"`
+	Fingerprint   string                      `json:"fingerprint"`
+	Source        string                      `json:"source"`
+	Location      sourceRange                 `json:"location"`
 }
 
 type impactContext struct {
@@ -138,7 +141,7 @@ func collectImpactSnapshot(ctx context.Context, root string, resolve bool) (impa
 			continue
 		}
 		result.Symbols = append(result.Symbols, impactSymbol{
-			ExecutionKind: symbol.ExecutionKind, ID: symbol.ID, Key: symbol.impactKey, Signature: symbol.impactSignature,
+			Role: symbol.Role, TestContext: symbol.TestContext, ExecutionKind: symbol.ExecutionKind, ID: symbol.ID, Key: symbol.impactKey, Signature: symbol.impactSignature,
 			Fingerprint: symbol.impactFingerprint, Source: symbol.impactSource, Location: symbol.Definition,
 		})
 	}

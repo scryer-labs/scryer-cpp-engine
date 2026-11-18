@@ -104,6 +104,19 @@ their translation unit and source evidence and include `callerSymbolId` and
 `targetSymbolId` when they can be matched to the static symbols. Compiler-only
 edges remain in the semantic list even when no syntactic call site matches.
 
+## Deterministic test roles
+
+Resolved call-graph and impact symbols can carry `role: "TEST"` and
+`testContext` evidence from compiler-bound test registration. The standalone
+`internal/testclassification` module keeps its API rules in `registrations.json`.
+Its initial GoogleTest rule recognizes the registration API, including macro
+wrappers, rather than requiring a macro to be named `TEST`. A matching compiler
+USR and framework declaration at the macro-defined function's start are required.
+An ordinary function calling the registration API, a test-like filename, linked
+framework or helper call does not establish a test-only scope. Unknown roles
+remain unknown. Other frameworks, build registrations and user-defined rules
+can extend this module; they are not currently implemented.
+
 ## Windows named-pipe facts
 
 `--facts ipc` scans source for Windows named-pipe evidence without building the

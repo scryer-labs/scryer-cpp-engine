@@ -81,6 +81,7 @@ func (g *callGraph) joinSemantic(result *clangscan.Result) {
 	}
 	calls.prepare()
 	symbols.prepare()
+	g.classifyRegisteredTests(result, symbols)
 	definitions := map[string]string{}
 	definitionLocations := map[string]clangscan.Location{}
 	for _, definition := range result.Definitions {

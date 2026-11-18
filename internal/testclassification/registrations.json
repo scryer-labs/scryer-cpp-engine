@@ -1,0 +1,7 @@
+[
+  {
+    "framework": "googletest",
+    "symbolUsrPrefix": "c:@N@testing@N@internal@F@MakeAndRegisterTestInfo#",
+    "definitionSuffix": "/gtest/internal/gtest-internal.h"
+  }
+]
