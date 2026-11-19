@@ -1,12 +1,22 @@
 # Scryer C++ Engine
 
-A Scryer engine for C++, C and CMake facts. It embeds the Tree-sitter parser
-and ships a C ABI v1 library and an engine manifest.
+A Scryer engine for C++, C and CMake facts. It embeds Tree-sitter and ships a
+C ABI v1 shared library and an `engine.json` manifest, with no standalone CLI.
+Scryer Core calls the engine, aggregates its JSON facts, compares impact
+snapshots, and renders reports. CMake extraction and C/C++ extraction remain
+separate modules.
+
+| Operation | Collection | Target-project requirements |
+|---|---|---|
+| Static scan | Tree-sitter and CMake source declarations | Source files; no build or external parser installation |
+| Scan with `--resolve` | Static facts enriched with libclang observations | Local libclang and usable compiler arguments; CMake/toolchain/dependencies if a database must be generated |
+| Coverage | Import an LLVM export, or build and run instrumented tests | Automatic collection currently requires macOS, a buildable CMake project and Apple LLVM tools |
+| Impact | Shared scan evidence for immutable before/after snapshots | Git repository; selecting test targets/binaries also requires compiler resolution and after-snapshot coverage |
 
 ## Install and scan
 
-With a current Scryer CLI, install or upgrade the official macOS arm64 or
-Windows amd64 package:
+Engine ID: `cpp`. Official packages cover macOS arm64 and Windows amd64.
+Install a missing engine or upgrade an installed one with the current Scryer CLI:
 
 ```sh
 scryer engine install cpp
@@ -22,8 +32,18 @@ compiler. Install the resulting local package into Scryer:
 scryer engine install cpp --from "$PWD/build/install/scryer-cpp-engine"
 ```
 
-The installed package embeds Tree-sitter. Scanning requires neither a C++
-compiler on the user's machine nor a build of the target project.
+The local `install --from` command expects `cpp` to be absent. To replace an
+existing engine with a development package, run `scryer engine uninstall cpp`
+first. Remote `upgrade cpp` installs the official release instead of rebuilding
+local source.
+
+Static scanning uses the embedded parser. Compiler resolution and automatic
+coverage have the additional requirements described below. The package does not
+bundle libclang, CMake, a target-project compiler or LLVM coverage tools.
+
+Engine facts are JSON. Core supplies terminal and Markdown scan views; scan HTML
+is not provided. Analyze can write `.md` or offline `.html` with `-o`; structured
+JSON uses `--json` on stdout, not `-o report.json`.
 
 ## Facts
 
@@ -68,15 +88,18 @@ outside this static resolution.
 `call-graph` returns syntactic function definitions, lambdas and call sites with
 project-relative paths and one-based line/byte-column ranges (end exclusive).
 Calls include the enclosing symbol when one is visible. A unique exact spelling
-in the scanned definitions can appear as a candidate. With `--resolve`, semantic
+in the scanned definitions can appear as a candidate.
 The symbol table also preserves initialized variable templates as declaration
 nodes and marks explicit `consteval` functions with `executionKind: "compile-time"`.
 Semantic declaration/type references are retained in `semantic.references[]`,
 separately from calls in `semantic.edges[]`. These can preserve dependencies
 through variable-template instantiations and unevaluated `decltype` expressions.
 Instantiations share a source node, so their dependency union is conservative.
-Semantic edges can link `callSiteId`, `callerSymbolId` and `targetSymbolId` when compiler
-evidence and source locations allow.
+With `--resolve`, semantic edges can link `callSiteId`, `callerSymbolId` and
+`targetSymbolId` when compiler evidence and source locations allow. A compiler
+reference or call expression does not establish runtime execution. Dependent
+expressions, unobserved template instantiations, virtual dispatch and unprojected
+types can still leave boundaries.
 
 Request all three views with `--facts architecture,files,call-graph`. The project
 ID is the local scan root. Within that project, join components by component ID,
@@ -96,7 +119,20 @@ project root, then a unique database under the project. When none is found, it
 configures CMake in a temporary directory and removes the directory after the
 scan. It passes compiler arguments to libclang without invoking the commands.
 The JSON preserves Tree-sitter and CMake facts and adds semantic edges,
-translation-unit target triples, coverage and diagnostic or skip details.
+translation-unit target triples, which source units were parsed or lacked
+commands, and diagnostic or skip details. This is compiler parsing, not test coverage.
+The resolver does not build or run the target, although CMake configuration can
+fetch declared dependencies or execute project configure commands.
+
+```sh
+scryer project scan . --facts files,call-graph --resolve --json --compact
+scryer project scan . --facts files,call-graph --resolve --compile-commands build/compile_commands.json --json --compact
+```
+
+Scan reports `resolved`, `partial` or `skipped` resolution evidence. The selected
+compiler arguments and platform conditions limit the observed graph; this does
+not include all inactive platform implementations. Dynamic impact applies the
+stricter failure rule described below.
 
 C++ call sites have a project-scoped `callSiteId`. With semantic resolution,
 `semanticEdgeIds` links a site to its observed libclang edges. Those edges retain
@@ -137,14 +173,22 @@ target. Project JSON exposes it as the `ipc` engine fact under
 
 Alongside `windows.namedPipe`, `data.calls` records qualified calls with statically known string arguments and
 candidate symbols. Core can join these observations to parameter evidence
-from the project or a referenced library. The calls themselves carry no endpoint
+from the project or a referenced library, then aggregate project/workspace
+communication relationships. The calls themselves carry no endpoint
 role. Named endpoints and pipe-name calls can include entrypoint evidence and
 the CMake executable IDs associated with the entrypoint source.
 
+These are Windows API source facts and can be collected on macOS without
+running Windows code. The current IPC collector covers Windows named pipes and
+shared memory; it does not provide general REST, RPC or all-OS IPC discovery.
+See Core's [communication contract](https://github.com/scryer-labs/scryer/blob/main/docs/contracts/WORKSPACE-IPC.md)
+for aggregation.
+
 `CreateFile` is treated as a client observation when the argument is a named-pipe
 path or the same source value reaches `WaitNamedPipe` in the function. Test
-observations carry `sourceRole: test` based on the source directory. This is
-bounded source analysis, so dynamic names, arbitrary data flow and cross-project
+observations carry a legacy `sourceRole: test` hint based on the source
+directory. This IPC-specific hint is not the deterministic `role: "TEST"` and
+`testContext` described above. This is bounded source analysis, so dynamic names, arbitrary data flow and cross-project
 matching are outside this scan.
 
 ## Windows shared-memory facts
@@ -168,10 +212,17 @@ runtime evidence.
 
 ## Runtime coverage
 
-On macOS, automatic coverage uses CMake, Apple Clang, and the matching
-LLVM tools from `xcrun`. The engine creates a temporary instrumented Debug
-build, runs CTest or selected executables, merges raw profiles, and reads
-the LLVM export.
+On macOS, automatic coverage uses CMake, its Unix Makefiles generator, Apple
+Clang and matching `llvm-profdata`/`llvm-cov` tools found through `xcrun`.
+The source root must contain `CMakeLists.txt` and no in-source `CMakeCache.txt`.
+The engine configures a temporary instrumented Debug build with
+`BUILD_TESTING=ON`, builds, runs CTest or selected executables, merges profiles
+and reads the LLVM export. It removes its temporary build afterwards. The
+project must support building and running its selected tests on the host;
+Windows automatic collection is not implemented.
+
+No source edits or existing coverage export are required. Project-defined CMake
+configuration and test commands still execute as part of this operation.
 
 ```sh
 scryer project analyze . --operations coverage --json
@@ -180,35 +231,89 @@ scryer project analyze . --operations coverage --test-binary tests/unit,tests/in
 scryer project analyze . --operations coverage --coverage-file /path/to/llvm-cov.json --json
 ```
 
-`--test-target` builds and runs CMake executable targets by name.
-Paths passed to `--test-binary` start at the temporary build directory.
+With no test selection, automatic coverage runs the project's CTest inventory.
+A project without CTest registration can select executable targets instead.
+`--test-target` matches exact CMake executable target names through the CMake
+File API, builds them and runs their reported artifacts. It does not recursively
+search for similarly named files; wildcards and fuzzy matching are not supported.
+Paths passed to `--test-binary` start at the temporary build directory, not the
+repository or an existing local build. Prefer target names when available.
+Both flags accept repeated or comma-separated selections. Target selection,
+binary selection and `--coverage-file` import are mutually exclusive.
 The last command imports an existing v2 or v3
 [llvm-cov export](https://llvm.org/docs/CommandGuide/llvm-cov.html#export-command).
-Both paths report aggregate source evidence with an artifact hash. File paths
-and an artifact hash do not identify a source revision.
-## Static change impact
+Both paths report aggregate source-region evidence with an artifact hash.
+Standalone coverage describes the supplied/current source, without an immutable
+Git comparison. File paths and an artifact hash do not identify a source revision.
+A collected profile does not identify which individual test exercised a region
+or establish assertion effectiveness. Missing profiles are not zero coverage.
 
-The `impact` engine operation supplies function definitions, normalized
-declarator keys, token fingerprints, source ranges, and syntax call candidates
-for two immutable snapshots. Core owns the comparison, reachability traversal
-and report presentation.
+## Change impact
+
+The `impact` engine operation reuses scan collection for two immutable
+snapshots. It supplies named function and initialized variable-template
+identities, token fingerprints, source ranges, and call/reference evidence.
+Core owns snapshot selection, comparison, graph traversal, coverage matching
+and presentation. It defaults to the `impact` analyze operation.
 
 ```sh
-scryer project analyze . --stack cpp --json -o impact.html
+# Static impact: no tests are run.
+scryer project analyze . --json -o impact.md
+# Compiler-resolved impact plus after-snapshot coverage.
+scryer project analyze . --test-target unit_tests --json -o impact.html
+# Explicit revisions; both flags are required together.
+scryer project analyze . --before HEAD~1 --after HEAD --test-target unit_tests -o impact.html
 ```
 
+Core defaults to the latest two commits for a clean working tree, or HEAD and
+an immutable working-tree snapshot when there are uncommitted changes. Explicit
+`--before` and `--after` override that selection and must appear together.
+Coverage alone does not accept comparison revisions. Use `--stack cpp` only when
+an explicit engine selection is needed.
+
 Comments and whitespace do not mark a function changed. File moves and signature
-changes appear as removal and addition. Ambiguous identities and changes outside
-function definitions stay unresolved. Candidate edges express potential
-connections. Without test selection, impact reuses static scan collection. Selecting
+changes appear as removal and addition. Ambiguous identities and source context
+outside the projected declarations remain explicit uncertainty. Candidate edges
+express potential connections. Without test selection, impact reuses static scan
+collection. Selecting
 `--test-target` or `--test-binary` reuses scan's compiler-resolution path and
 after-snapshot coverage. Runtime coverage is `NOT_APPLICABLE` for immediate
 functions and variable-template declaration nodes; their references do not prove
-runtime execution or constant evaluation. Dynamic failures stop analysis and produce no static
-replacement. The shared resolver joins cross-unit definitions by compiler USR.
+runtime execution or constant evaluation. They are excluded from assessed runtime
+coverage counts. The shared resolver joins cross-unit definitions by compiler USR.
+A skipped/partial compiler resolution, failed build/test, missing coverage profile
+or a mutated snapshot stops dynamic impact; there is no static fallback report.
+Core verifies the after snapshot stayed clean before associating collected
+coverage with its commit.
+
+Impact alone includes matching coverage evidence. `--operations impact,coverage`
+also includes the full coverage report. JSON keeps all evidence edges; Core's
+HTML groups parallel evidence into inspectable connections. Neither these graphs
+nor an execution percentage prove a unique runtime/test path or refactoring safety.
 See the [impact contract](https://github.com/scryer-labs/scryer/blob/main/docs/contracts/IMPACT.md).
 
-## Release verification
+## Implementation and verification
 
-The [GitHub workflow](.github/workflows/ci.yml) builds the platform packages
-and exercises a scan through the ABI before publishing a version tag.
+| Module | Responsibility |
+|---|---|
+| `cmd/cpp-engine-abi` | Thin C ABI v1 entry point, execution/cancellation and response buffers |
+| `internal/engine` | Request dispatch, fact assembly, source identities and scan-to-impact projection |
+| `internal/cmake` | Independent static CMake declaration collection |
+| `internal/clangscan` | Optional libclang loading, compilation databases and compiler evidence |
+| `internal/ipc` | Windows named-pipe/shared-memory observations and bounded source traces |
+| `internal/coverage` | Temporary instrumented builds, test execution and LLVM normalization |
+| `internal/testclassification` | Compiler registration rules and narrow test-role evidence |
+| `internal/process` | Subprocess cancellation support |
+
+The [GitHub workflow](.github/workflows/ci.yml) runs Go tests and vet, builds the
+macOS arm64 and Windows amd64 packages, and calls
+[`scripts/check-package.py`](scripts/check-package.py) through the packaged ABI
+for static scan and impact checks. A `vMAJOR.MINOR.PATCH` tag publishes both ZIP
+assets after the matrix succeeds. Other workflow runs do not publish a release.
+`SCRYER_ENGINE_VERSION` controls local package version metadata, defaulting to
+`0.0.0-dev`; `SCRYER_ENGINE_PACKAGE` overrides its output directory.
+
+Hosted package checks are not acceptance of arbitrary target builds or Windows
+runtime coverage. Local development acceptance uses the configured Orrery plans
+for the affected engine and Core integration. Engine facts and test-role rules
+are independent of Core's Markdown/HTML report resources.
