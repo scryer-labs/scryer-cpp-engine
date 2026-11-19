@@ -114,8 +114,12 @@ wrappers, rather than requiring a macro to be named `TEST`. A matching compiler
 USR and framework declaration at the macro-defined function's start are required.
 An ordinary function calling the registration API, a test-like filename, linked
 framework or helper call does not establish a test-only scope. Unknown roles
-remain unknown. Other frameworks, build registrations and user-defined rules
-can extend this module; they are not currently implemented.
+remain unknown. Catch2 and other C++ test frameworks currently have no automatic
+test-role recognition rule. Their tests remain unclassified unless supported
+registration evidence is available; a test-like name does not change that.
+This limitation concerns role classification, not the ability to run selected
+executables or collect their coverage. Other framework rules, build registrations
+and user-defined rules are deferred and can extend this Engine module.
 
 ## Windows named-pipe facts
 
