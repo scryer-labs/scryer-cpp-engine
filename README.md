@@ -11,7 +11,7 @@ separate modules.
 | Static scan | Tree-sitter and CMake source declarations | Source files; no build or external parser installation |
 | Scan with `--resolve` | Static facts enriched with libclang observations | Local libclang and usable compiler arguments; CMake/toolchain/dependencies if a database must be generated |
 | Coverage | Import an LLVM export, or build and run instrumented tests | Automatic collection currently requires macOS, a buildable CMake project and Apple LLVM tools |
-| Impact | Shared scan evidence for immutable before/after snapshots | Git repository; selecting test targets/binaries also requires compiler resolution and after-snapshot coverage |
+| Impact | Shared scan evidence for immutable before/after snapshots | Git repository; `--resolve` or selecting test targets/binaries also requires compiler resolution and after-snapshot coverage |
 
 ## Install and scan
 
@@ -317,3 +317,19 @@ Hosted package checks are not acceptance of arbitrary target builds or Windows
 runtime coverage. Local development acceptance uses the configured Orrery plans
 for the affected engine and Core integration. Engine facts and test-role rules
 are independent of Core's Markdown/HTML report resources.
+
+## Known gaps
+
+- Static calls and includes retain candidates and unresolved boundaries. The
+  compiler pass requires usable host build inputs; inactive platform code,
+  unavailable template instantiations, indirect dispatch and dynamic wrappers
+  are not guaranteed to resolve.
+- Test-role registration currently supports GoogleTest evidence. Catch2 and
+  other framework rules are deferred; their executables can still run for coverage.
+- Runtime coverage currently uses the documented macOS CMake/Apple LLVM path;
+  other build systems/compiler coverage formats and Windows runtime acceptance
+  are not implemented. Test-target names are exact, without fuzzy matching.
+- Coverage is aggregate, without per-test attribution or assertion-effectiveness
+  proof. Test-effectiveness rules and C++ ownership/lifetime analysis remain planned.
+- IPC supports the documented Windows named-pipe/shared-memory patterns and
+  wrapper evidence, not arbitrary IPC APIs or REST/RPC/GraphQL.
