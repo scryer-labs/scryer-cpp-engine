@@ -26,9 +26,10 @@ cat > "$package/engine.json" <<MANIFEST
     "mock": false
   },
   "capabilities": {
-    "languages": ["C++"],
+    "languages": ["C++", "C", "CMake"],
     "operations": ["scan", "coverage", "impact"],
     "coverageTestTargets": true,
+    "scanFileSelection": true,
     "scanFacts": ["dependencies", "architecture", "files", "call-graph", "ipc"],
     "resolveFacts": ["files", "call-graph"]
   },

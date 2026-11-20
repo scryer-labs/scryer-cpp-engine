@@ -45,6 +45,39 @@ Engine facts are JSON. Core supplies terminal and Markdown scan views; scan HTML
 is not provided. Analyze can write `.md` or offline `.html` with `-o`; structured
 JSON uses `--json` on stdout, not `-o report.json`.
 
+## Project file selection
+
+With current Core, optional `.scryer/project.yaml` selects Core stack/LOC and
+C++/CMake inputs together:
+
+```yaml
+schemaVersion: 1
+scan:
+  include: ["CMakeLists.txt", "cmake/**", "src/**", "include/**", "tests/**"]
+  exclude: ["src/generated/**", "tests/fixtures/**"]
+```
+
+Core owns parsing, Git-aware inventory and patterns. The Engine's independent
+`internal/selection` module validates a temporary, checksummed path-list reference;
+`internal/cmake.ScanFiles` and the C/C++ collector consume the same list without
+interpreting Core configuration. The package declares `scanFileSelection: true`.
+It accepts a `scan.fileSelection` reference (`path`, `sha256`, `fileCount`) and
+returns a `selection` receipt (`sha256`, `fileCount`). Impact accepts matching
+`beforeSelection`/`afterSelection` references and returns per-snapshot receipts.
+No C ABI symbol changes are required. See Core's
+[project scope contract](https://github.com/scryer-labs/scryer/blob/main/docs/contracts/PROJECT-SCOPE.md).
+
+Without configuration existing traversal is unchanged. With configuration only
+selected C/C++ and CMake files produce observations. Referenced external or
+excluded targets may remain boundary references; libclang may still read headers
+as compilation context. Include build files intentionally when restricting the
+scope. Scope does not change configure/build commands, test execution or native
+coverage instrumentation, and does not imply code/test classification.
+Git-ignored untracked files are outside the candidate inventory. Empty include
+selects no files. Core rejects missing selection receipts instead of accepting
+an unfiltered result. Package language matching includes C++, C and CMake;
+header-only projects without those detected languages remain a dispatch limitation.
+
 ## Facts
 
 The `dependencies` fact contains two independent collections:

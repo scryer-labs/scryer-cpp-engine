@@ -11,6 +11,7 @@ import (
 	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/cmake"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/coverage"
+	"github.com/scryer-labs/scryer-cpp-engine/internal/selection"
 )
 
 const (
@@ -24,18 +25,21 @@ type Request struct {
 	Stack           string `json:"stack"`
 	Operation       string `json:"operation"`
 	Scan            struct {
-		Repository      string   `json:"repository"`
-		Static          *bool    `json:"static"`
-		CompileCommands string   `json:"compileCommands"`
-		Facts           []string `json:"facts"`
+		Repository      string               `json:"repository"`
+		Static          *bool                `json:"static"`
+		CompileCommands string               `json:"compileCommands"`
+		FileSelection   *selection.Reference `json:"fileSelection,omitempty"`
+		Facts           []string             `json:"facts"`
 		forImpact       bool
 	} `json:"scan"`
 	Impact struct {
-		Before     string `json:"before"`
-		After      string `json:"after"`
-		BeforeRoot string `json:"beforeRoot"`
-		AfterRoot  string `json:"afterRoot"`
-		Resolve    bool   `json:"resolve"`
+		Before          string               `json:"before"`
+		After           string               `json:"after"`
+		BeforeRoot      string               `json:"beforeRoot"`
+		BeforeSelection *selection.Reference `json:"beforeSelection,omitempty"`
+		AfterSelection  *selection.Reference `json:"afterSelection,omitempty"`
+		AfterRoot       string               `json:"afterRoot"`
+		Resolve         bool                 `json:"resolve"`
 	} `json:"impact"`
 	Coverage struct {
 		Repository   string   `json:"repository"`
@@ -59,6 +63,7 @@ type protocolError struct {
 }
 
 type report struct {
+	Selection      *selection.Receipt `json:"selection,omitempty"`
 	impactContexts []impactContext
 	SchemaVersion  int            `json:"schemaVersion"`
 	Root           string         `json:"root"`
@@ -110,6 +115,15 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	if info, err := os.Stat(root); err != nil || !info.IsDir() {
 		return nil, &protocolError{"INVALID_REQUEST", "scan repository must be an existing directory"}
 	}
+	selectedFiles, err := selection.Load(root, r.Scan.FileSelection)
+	if err != nil {
+		return nil, &protocolError{"FILE_SELECTION_ERROR", err.Error()}
+	}
+	defer selectedFiles.Close()
+	var receipt *selection.Receipt
+	if selectedFiles != nil {
+		receipt = selectedFiles.Receipt
+	}
 	architectureRequested := slices.Contains(selected, "architecture")
 	filesRequested := slices.Contains(selected, "files")
 	dependenciesRequested := slices.Contains(selected, "dependencies")
@@ -119,7 +133,11 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 	var buildFacts cmake.Facts
 	if architectureRequested || filesRequested || dependenciesRequested || ipcRequested {
 		var err error
-		buildFacts, err = cmake.Scan(ctx, root)
+		if selectedFiles == nil {
+			buildFacts, err = cmake.Scan(ctx, root)
+		} else {
+			buildFacts, err = cmake.ScanFiles(ctx, root, selectedFiles.Files)
+		}
 		if err != nil {
 			return nil, &protocolError{"CMAKE_SCAN_ERROR", err.Error()}
 		}
@@ -131,7 +149,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		facts["architecture"] = describeArchitecture(root, buildFacts)
 	}
 	if filesRequested || dependenciesRequested || callsRequested || ipcRequested {
-		sources, err := scanSources(ctx, root, filesRequested || dependenciesRequested, callsRequested, ipcRequested, r.Scan.forImpact)
+		sources, err := scanSelectedSources(ctx, root, filesRequested || dependenciesRequested, callsRequested, ipcRequested, r.Scan.forImpact, selectedFiles)
 		if err != nil {
 			return nil, &protocolError{"CPP_SCAN_ERROR", err.Error()}
 		}
@@ -161,7 +179,7 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 			facts["call-graph"] = sources.graph
 		}
 	}
-	return &report{SchemaVersion: 1, Root: root, Facts: facts, impactContexts: contexts}, nil
+	return &report{SchemaVersion: 1, Root: root, Facts: facts, impactContexts: contexts, Selection: receipt}, nil
 }
 
 func (r Request) collectCoverage(ctx context.Context) (any, *protocolError) {

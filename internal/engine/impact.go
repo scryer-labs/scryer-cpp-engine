@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
+	"github.com/scryer-labs/scryer-cpp-engine/internal/selection"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/testclassification"
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
@@ -45,11 +46,12 @@ type impactCall struct {
 }
 
 type impactSnapshot struct {
-	Resolution *clangscan.Result `json:"resolution,omitempty"`
-	Contexts   []impactContext   `json:"contexts"`
-	Symbols    []impactSymbol    `json:"symbols"`
-	Calls      []impactCall      `json:"calls"`
-	Notes      []string          `json:"notes"`
+	Selection  *selection.Receipt `json:"selection,omitempty"`
+	Resolution *clangscan.Result  `json:"resolution,omitempty"`
+	Contexts   []impactContext    `json:"contexts"`
+	Symbols    []impactSymbol     `json:"symbols"`
+	Calls      []impactCall       `json:"calls"`
+	Notes      []string           `json:"notes"`
 }
 
 func tokenText(node *sitter.Node, source []byte, outsideFunctions bool) string {
@@ -105,8 +107,12 @@ func impactIdentity(node *sitter.Node, file string, source []byte) (string, stri
 }
 
 func collectImpactSnapshot(ctx context.Context, root string, resolve bool) (impactSnapshot, error) {
+	return collectSelectedImpactSnapshot(ctx, root, resolve, nil)
+}
+func collectSelectedImpactSnapshot(ctx context.Context, root string, resolve bool, selected *selection.Reference) (impactSnapshot, error) {
 	request := Request{}
 	request.Scan.Repository = root
+	request.Scan.FileSelection = selected
 	request.Scan.Facts = []string{"call-graph"}
 	static := !resolve
 	request.Scan.Static = &static
@@ -128,7 +134,7 @@ func collectImpactSnapshot(ctx context.Context, root string, resolve bool) (impa
 		return impactSnapshot{}, fmt.Errorf("compiler scan did not resolve successfully; impact stopped: %s", detail)
 	}
 	result := impactSnapshot{
-		Symbols: []impactSymbol{}, Calls: []impactCall{}, Contexts: scanned.impactContexts,
+		Selection: scanned.Selection, Symbols: []impactSymbol{}, Calls: []impactCall{}, Contexts: scanned.impactContexts,
 		Notes: []string{
 			"Syntax-only C++ impact. Name candidates are potential links, without compiler name or overload resolution.",
 			"Named function definitions and initialized variable-template declarations receive comparison keys. Lambdas, anonymous scopes and parse errors remain outside symbol correspondence.",
@@ -180,11 +186,11 @@ func (r Request) collectImpact(ctx context.Context) (any, *protocolError) {
 			return nil, &protocolError{"INVALID_REQUEST", "impact snapshot must be an existing directory"}
 		}
 	}
-	before, err := collectImpactSnapshot(ctx, request.BeforeRoot, request.Resolve)
+	before, err := collectSelectedImpactSnapshot(ctx, request.BeforeRoot, request.Resolve, request.BeforeSelection)
 	if err != nil {
 		return nil, &protocolError{"CPP_IMPACT_ERROR", "before scan: " + err.Error()}
 	}
-	after, err := collectImpactSnapshot(ctx, request.AfterRoot, request.Resolve)
+	after, err := collectSelectedImpactSnapshot(ctx, request.AfterRoot, request.Resolve, request.AfterSelection)
 	if err != nil {
 		return nil, &protocolError{"CPP_IMPACT_ERROR", "after scan: " + err.Error()}
 	}

@@ -4,6 +4,7 @@ package cmake
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -111,6 +112,41 @@ func Scan(ctx context.Context, root string) (Facts, error) {
 		return facts.scanFile(ctx, filepath.ToSlash(file), strings.TrimPrefix(string(source), "\uFEFF"))
 	})
 	return facts, err
+}
+
+// ScanFiles reads only explicitly selected build files. CMake remains independent
+// of the source parser and of Core's project configuration format.
+func ScanFiles(ctx context.Context, root string, files []string) (Facts, error) {
+	facts := Facts{Targets: []Target{}, Links: []Link{}, ExternalDependencies: []ExternalDependency{}, Subdirectories: []Subdirectory{}, Unresolved: []Unresolved{}}
+	directory, err := os.OpenRoot(root)
+	if err != nil {
+		return facts, err
+	}
+	defer directory.Close()
+	for _, name := range files {
+		if err = ctx.Err(); err != nil {
+			return facts, err
+		}
+		if filepath.Base(name) != "CMakeLists.txt" && !strings.HasSuffix(name, ".cmake") {
+			continue
+		}
+		file, err := directory.Open(filepath.FromSlash(name))
+		if err != nil {
+			return facts, err
+		}
+		data, readErr := io.ReadAll(file)
+		closeErr := file.Close()
+		if readErr != nil {
+			return facts, readErr
+		}
+		if closeErr != nil {
+			return facts, closeErr
+		}
+		if err = facts.scanFile(ctx, name, strings.TrimPrefix(string(data), "\uFEFF")); err != nil {
+			return facts, err
+		}
+	}
+	return facts, nil
 }
 
 type block struct {

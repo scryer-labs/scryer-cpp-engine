@@ -11,6 +11,7 @@ import (
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/ipc"
+	"github.com/scryer-labs/scryer-cpp-engine/internal/selection"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 	cpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
 )
@@ -37,6 +38,9 @@ type sourceFacts struct {
 }
 
 func scanSources(ctx context.Context, root string, includes, calls, ipcRequested, impact bool) (sourceFacts, error) {
+	return scanSelectedSources(ctx, root, includes, calls, ipcRequested, impact, nil)
+}
+func scanSelectedSources(ctx context.Context, root string, includes, calls, ipcRequested, impact bool, selected *selection.Set) (sourceFacts, error) {
 	parser := sitter.NewParser()
 	defer parser.Close()
 	if err := parser.SetLanguage(sitter.NewLanguage(cpp.Language())); err != nil {
@@ -47,7 +51,7 @@ func scanSources(ctx context.Context, root string, includes, calls, ipcRequested
 	if calls {
 		facts.graph = callGraph{ProjectID: root, Basis: "tree-sitter-syntax", withImpact: impact, Symbols: []functionSymbol{}, Calls: []callSite{}}
 	}
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+	visit := func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -66,7 +70,13 @@ func scanSources(ctx context.Context, root string, includes, calls, ipcRequested
 		if !entry.Type().IsRegular() || !isSource(path) {
 			return nil
 		}
-		source, err := os.ReadFile(path)
+		var source []byte
+		if selected == nil {
+			source, err = os.ReadFile(path)
+		} else {
+			relative, _ := filepath.Rel(root, path)
+			source, err = selected.ReadFile(filepath.ToSlash(relative))
+		}
 		if err != nil {
 			return err
 		}
@@ -102,7 +112,13 @@ func scanSources(ctx context.Context, root string, includes, calls, ipcRequested
 		}
 		tree.Close()
 		return err
-	})
+	}
+	var err error
+	if selected == nil {
+		err = filepath.WalkDir(root, visit)
+	} else {
+		err = selected.Walk(ctx, visit)
+	}
 	if err == nil && calls {
 		facts.graph.findCandidates()
 	}
