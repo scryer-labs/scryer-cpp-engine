@@ -16,6 +16,9 @@ separate modules.
 ## Install and scan
 
 Engine ID: `cpp`. Official packages cover macOS arm64 and Windows amd64.
+Version 0.3.0 adds Core-owned project file selection and selection receipts.
+Use the updated Core with `scanFileSelection` support when configuring project
+include/exclude rules. Existing unconfigured scans remain unchanged.
 Install a missing engine or upgrade an installed one with the current Scryer CLI:
 
 ```sh
@@ -314,10 +317,13 @@ after-snapshot coverage. Runtime coverage is `NOT_APPLICABLE` for immediate
 functions and variable-template declaration nodes; their references do not prove
 runtime execution or constant evaluation. They are excluded from assessed runtime
 coverage counts. The shared resolver joins cross-unit definitions by compiler USR.
-A skipped/partial compiler resolution, failed build/test, missing coverage profile
-or a mutated snapshot stops dynamic impact; there is no static fallback report.
-Core verifies the after snapshot stayed clean before associating collected
-coverage with its commit.
+A skipped/partial compiler resolution stops this Engine's dynamic impact
+projection; Core can retain other Engines' usable results. Failed build/test,
+missing coverage or a mutated snapshot leaves an explicit incomplete coverage
+stage while Core preserves the already collected compiler impact graph. Unverified
+coverage does not become execution hits. There is no static retry presented as
+dynamic evidence. Core verifies the after snapshot stayed clean before associating
+collected coverage with its commit.
 
 Impact alone includes matching coverage evidence. `--operations impact,coverage`
 also includes the full coverage report. JSON keeps all evidence edges; Core's
@@ -332,6 +338,7 @@ See the [impact contract](https://github.com/scryer-labs/scryer/blob/main/docs/c
 | `cmd/cpp-engine-abi` | Thin C ABI v1 entry point, execution/cancellation and response buffers |
 | `internal/engine` | Request dispatch, fact assembly, source identities and scan-to-impact projection |
 | `internal/cmake` | Independent static CMake declaration collection |
+| `internal/selection` | Validate Core-owned file inventories and selection receipts |
 | `internal/clangscan` | Optional libclang loading, compilation databases and compiler evidence |
 | `internal/ipc` | Windows named-pipe/shared-memory observations and bounded source traces |
 | `internal/coverage` | Temporary instrumented builds, test execution and LLVM normalization |
@@ -366,3 +373,34 @@ are independent of Core's Markdown/HTML report resources.
   proof. Test-effectiveness rules and C++ ownership/lifetime analysis remain planned.
 - IPC supports the documented Windows named-pipe/shared-memory patterns and
   wrapper evidence, not arbitrary IPC APIs or REST/RPC/GraphQL.
+
+## Next priorities
+
+The macOS C++ sequence after project file selection is:
+
+1. Improve CMake target/source relationships, starting with concrete variable
+   expansion gaps. Retain unresolved generator expressions and conditional inputs;
+   keep build-model collection independent from C/C++ parsing.
+2. Verify large real repositories with explicit include/exclude scope. Measure
+   time, memory and output size, and inspect missing/false target memberships,
+   include links and cross-file calls. A completed JSON export is not proof of
+   complete architecture extraction.
+3. Improve per-file/translation-unit completeness evidence and partial-result
+   diagnostics. Missing compilation commands or failed units must remain visible
+   instead of implying that missing relations do not exist.
+4. Extend deterministic test registration evidence, beginning with concrete
+   Catch2 cases when needed. No name/path-based test classification; user-defined
+   groups remain separate from Engine-backed test identity.
+
+Function-body control flow, data flow and execution ordering are deferred until
+ownership/lifetime work requires them. The current graph records callable nodes
+and located call/reference observations; it does not model complete local symbols
+or runtime sequences. Implementation-similarity assertions are not a prerequisite
+for current scan work. Test effectiveness, per-test coverage attribution, Windows
+runtime acceptance, additional build systems and fuzzy test-target matching remain
+later work.
+
+Large artifacts can exceed a consumer's size limit even with compact JSON.
+Core's `--compact` removes formatting, without dropping facts. Consumers own large
+artifact storage and loading; project selection controls collection scope and is
+not a substitute for handling legitimate large reports.
