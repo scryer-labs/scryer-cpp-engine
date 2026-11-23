@@ -70,3 +70,47 @@ object-sensitive analysis. Conflicting struct layouts, unresolved typedefs,
 complex macro expansion, conditional preprocessing and mutations can prevent or
 broaden projection. Static impact preserves these candidates and their basis;
 compiler-resolved impact continues to use compiler targets exclusively.
+
+## POSIX communication and dynamic loader evidence (source development)
+
+The `ipc` fact adds `posix.unixSocket` and `posix.sharedMemory`. Each mechanism
+contains `observations[]` (including unresolved operations) and `endpoints[]`
+(resource-bearing participation candidates). Existing Windows facts are unchanged.
+Every observation retains `api`, `expression`, source file/line/column, enclosing
+function information, `role`, `status`, `reason` and applicable `name`, `transport`
+and `accessFlags`. `resolved-resource` means a literal/macro/unique local assignment
+supplies a resource name, not that a resource exists or a message was exchanged.
+
+The initial native source rules cover `socket(AF_UNIX/AF_LOCAL, ...)`, `bind`,
+`connect`, `sendto`, `recvfrom`, `shm_open`, `shm_unlink`, `mmap` and `munmap`.
+Socket address names come from bounded local `sun_path` assignments or copying a
+known string. `SOCK_DGRAM` and `SOCK_STREAM` remain distinct. Shared-memory names
+can be literal strings or unambiguous object-like macro constants. `O_CREAT`
+marks a possible creator; it does not prove that the call created a new object.
+Cleanup/view operations remain observations rather than communication endpoints.
+
+Potential entrypoint traces reuse the named-call index, preserving source roots
+and call chains. Only explicit executable source membership supplies component
+IDs; a library is not a process. Indirect global arrays, aliasing, arbitrary
+formatting, descriptor reuse, cross-function value flow and unresolved constants
+remain boundaries. Lambda definitions alone are not execution roots. Native API
+spelling is a source observation, not compiler binding; conditional branches can
+coexist. The facts retain these limitations explicitly.
+
+`call-graph.dynamicBindings[]` records `dlopen`/`dlsym` lookup requests, with call
+site ID/range, handle expression, requested name when known, and source symbol
+candidates. `resolved-name` is not an actual runtime target. In particular,
+`RTLD_NEXT` and preload replacement depend on loader order and environment.
+No ordinary call edge is inferred solely from a lookup request.
+
+CMake source declarations involving `LD_PRELOAD` in `set`, `add_test`,
+`add_custom_target` or `set_tests_properties` appear in `runtimeBindings[]` on
+CMake dependency facts and architecture facts. They retain the original command,
+expression, location and conditional context with `status: declared-environment`.
+No host environment is read and no preload, build or test command is executed by
+static scanning. General linker interposition and generated launchers are outside
+this bounded collection.
+
+Core normalizes POSIX endpoints using a language-independent contract and retains
+raw engine observations. See the Core
+[communication contract](https://github.com/scryer-labs/scryer/blob/main/docs/contracts/WORKSPACE-IPC.md).

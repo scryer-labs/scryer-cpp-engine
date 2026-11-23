@@ -156,6 +156,8 @@ func (r Request) scan(ctx context.Context) (*report, *protocolError) {
 		contexts = sources.impactContexts
 		if ipcRequested {
 			ipcFacts := sources.ipc.Facts()
+			ipcFacts.Posix = sources.posix.Facts(&sources.macros)
+			sources.ipc.AttachPOSIXEntrypoints(ipcFacts.Posix)
 			attachIPCComponents(&ipcFacts, buildFacts)
 			facts["ipc"] = ipcFacts
 		}

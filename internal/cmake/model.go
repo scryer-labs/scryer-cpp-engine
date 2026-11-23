@@ -218,6 +218,10 @@ func (m *model) scanFile(ctx context.Context, file, sourceDir string, env enviro
 			"CMAKE_CURRENT_LIST_DIR":   {text: filepath.ToSlash(filepath.Join(m.root, filepath.FromSlash(path.Dir(file)))), known: true},
 			"CMAKE_CURRENT_LIST_FILE":  {text: filepath.ToSlash(filepath.Join(m.root, filepath.FromSlash(file))), known: true},
 		}
+
+		if (command.name == "set" || command.name == "set_tests_properties" || command.name == "add_custom_target" || command.name == "add_test") && strings.Contains(command.expression(), "LD_PRELOAD") {
+			m.facts.RuntimeBindings = append(m.facts.RuntimeBindings, RuntimeBinding{Location: loc, Command: command.name, Expression: command.expression(), Status: "declared-environment"})
+		}
 		switch command.name {
 		case "file":
 			if len(command.args) > 1 && (command.args[0].text == "GLOB" || command.args[0].text == "GLOB_RECURSE") {

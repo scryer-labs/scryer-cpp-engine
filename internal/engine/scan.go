@@ -11,6 +11,7 @@ import (
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/ipc"
+	"github.com/scryer-labs/scryer-cpp-engine/internal/ipc/posix"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/preprocessor"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/selection"
 	sitter "github.com/tree-sitter/go-tree-sitter"
@@ -30,16 +31,18 @@ type semanticFacts struct {
 }
 
 type sourceFacts struct {
-	indirect       indirectModel
-	macros         preprocessor.Catalog
-	parseRecovery  []string
-	api            []apiDeclaration
-	impactContexts []impactContext
-	resolution     *clangscan.Result
-	files          []string
-	includes       []Include
-	graph          callGraph
-	ipc            ipc.Collector
+	dynamicBindings []dynamicBindingInput
+	posix           posix.Collector
+	indirect        indirectModel
+	macros          preprocessor.Catalog
+	parseRecovery   []string
+	api             []apiDeclaration
+	impactContexts  []impactContext
+	resolution      *clangscan.Result
+	files           []string
+	includes        []Include
+	graph           callGraph
+	ipc             ipc.Collector
 }
 
 func scanSources(ctx context.Context, root string, includes, calls, ipcRequested, impact bool) (sourceFacts, error) {
@@ -130,6 +133,7 @@ func scanSelectedSources(ctx context.Context, root string, includes, calls, ipcR
 	if err == nil && calls {
 		facts.graph.findCandidates()
 		facts.graph.linkIndirect(&facts.indirect, &facts.macros)
+		facts.graph.linkDynamicBindings(facts.dynamicBindings, &facts.macros)
 		facts.graph.recordCompleteness(facts.parseRecovery)
 	}
 	return facts, err
@@ -154,6 +158,7 @@ func (facts *sourceFacts) collect(ctx context.Context, root *sitter.Node, file s
 		}
 		node := cursor.Node()
 		facts.macros.Observe(node, file, source)
+		facts.posix.Observe(node, file, source)
 		if includes {
 			if declaration, ok := observeAPI(node, file, source); ok {
 				facts.api = append(facts.api, declaration)
@@ -167,6 +172,9 @@ func (facts *sourceFacts) collect(ctx context.Context, root *sitter.Node, file s
 		if calls {
 			scopes = facts.graph.collect(node, file, source, scopes)
 			facts.indirect.observe(node, file, source, scopes)
+			if binding := observeDynamicBinding(node, file, source); binding != nil {
+				facts.dynamicBindings = append(facts.dynamicBindings, *binding)
+			}
 		}
 		if cursor.GotoFirstChild() {
 			continue

@@ -1,6 +1,7 @@
 package ipc
 
 import (
+	"github.com/scryer-labs/scryer-cpp-engine/internal/ipc/posix"
 	"path"
 	"slices"
 	"strings"
@@ -52,6 +53,7 @@ type CallEvidence struct {
 }
 
 type Facts struct {
+	Posix   *posix.Facts   `json:"posix,omitempty"`
 	Basis   string         `json:"basis"`
 	Calls   []CallEvidence `json:"calls,omitempty"`
 	Windows struct {

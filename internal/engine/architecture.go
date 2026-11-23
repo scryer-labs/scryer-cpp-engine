@@ -25,12 +25,13 @@ type componentAlias struct {
 }
 
 type architecture struct {
-	ProjectID         string             `json:"projectId"`
-	Basis             string             `json:"basis"`
-	AliasDeclarations []componentAlias   `json:"aliasDeclarations"`
-	Components        []component        `json:"components"`
-	Links             []componentLink    `json:"links"`
-	Unresolved        []cmake.Unresolved `json:"unresolved"`
+	RuntimeBindings   []cmake.RuntimeBinding `json:"runtimeBindings,omitempty"`
+	ProjectID         string                 `json:"projectId"`
+	Basis             string                 `json:"basis"`
+	AliasDeclarations []componentAlias       `json:"aliasDeclarations"`
+	Components        []component            `json:"components"`
+	Links             []componentLink        `json:"links"`
+	Unresolved        []cmake.Unresolved     `json:"unresolved"`
 }
 
 func componentsByName(targets []cmake.Target) map[string][]string {
@@ -74,7 +75,7 @@ func componentID(target cmake.Target) string {
 func describeArchitecture(root string, facts cmake.Facts) architecture {
 	index := componentsByName(facts.Targets)
 	result := architecture{
-		ProjectID: root, Basis: "cmake-declarations",
+		RuntimeBindings: facts.RuntimeBindings, ProjectID: root, Basis: "cmake-declarations",
 		Components: make([]component, 0, len(facts.Targets)),
 		Links:      make([]componentLink, 0, len(facts.Links)),
 		Unresolved: facts.Unresolved, AliasDeclarations: []componentAlias{},

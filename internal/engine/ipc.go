@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/scryer-labs/scryer-cpp-engine/internal/ipc/posix"
 	"slices"
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/cmake"
@@ -23,6 +24,7 @@ func attachIPCComponents(facts *ipc.Facts, build cmake.Facts) {
 			}
 		}
 	}
+	attachPOSIXComponents(facts.Posix, bySource)
 	attach := func(entries []ipc.Entrypoint) {
 		for i := range entries {
 			entries[i].ComponentIDs = bySource[entries[i].File]
@@ -47,4 +49,22 @@ func attachIPCComponents(facts *ipc.Facts, build cmake.Facts) {
 			attach(observation.Entrypoints)
 		}
 	}
+}
+
+func attachPOSIXComponents(facts *posix.Facts, sources map[string][]string) {
+	if facts == nil {
+		return
+	}
+	attach := func(observations []posix.Observation) {
+		for i := range observations {
+			for j := range observations[i].Entrypoints {
+				entry := &observations[i].Entrypoints[j]
+				entry.ComponentIDs = sources[entry.File]
+			}
+		}
+	}
+	attach(facts.UnixSocket.Endpoints)
+	attach(facts.UnixSocket.Observations)
+	attach(facts.SharedMemory.Endpoints)
+	attach(facts.SharedMemory.Observations)
 }

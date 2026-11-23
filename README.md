@@ -84,6 +84,10 @@ header-only projects without those detected languages remain a dispatch limitati
 ## Facts
 
 See [C++ fact extensions](docs/FACTS.md) for additive evidence and consumer rules.
+Source development after v0.3.0 adds evidence-based header provider candidates,
+macro-body source scopes, indirect callback candidates, POSIX API observations
+and dynamic loader declarations. These are bounded evidence, not complete
+preprocessing, concrete pointer dispatch or observed execution.
 
 The `dependencies` fact contains two independent collections:
 
@@ -371,6 +375,8 @@ See the [impact contract](https://github.com/scryer-labs/scryer/blob/main/docs/c
 | `internal/selection` | Validate Core-owned file inventories and selection receipts |
 | `internal/clangscan` | Optional libclang loading, compilation databases and compiler evidence |
 | `internal/ipc` | Windows named-pipe/shared-memory observations and bounded source traces |
+| `internal/ipc/posix` | Native POSIX resource observations; unknown names remain explicit |
+| `internal/preprocessor` | Bounded source macro constants and forwarding evidence |
 | `internal/coverage` | Temporary instrumented builds, test execution and LLVM normalization |
 | `internal/testclassification` | Compiler registration rules and narrow test-role evidence |
 | `internal/process` | Subprocess cancellation support |
@@ -403,11 +409,15 @@ are independent of Core's Markdown/HTML report resources.
 - Coverage is aggregate, without per-test attribution or assertion-effectiveness
   proof. Test-effectiveness rules and C++ ownership/lifetime analysis remain planned.
 - IPC supports the documented Windows named-pipe/shared-memory patterns and
-  wrapper evidence, not arbitrary IPC APIs or REST/RPC/GraphQL.
+  bounded POSIX Unix-datagram/shared-memory observations. Indirect/global POSIX
+  resource names can remain unresolved; Unix stream pairing and arbitrary IPC
+  APIs or REST/RPC/GraphQL are not implemented. Loader lookup/preload declarations
+  are evidence, not proven runtime replacement.
 
 ## Next priorities
 
-The macOS C++ sequence after project file selection is:
+The source slice now includes header provider candidates, macro callable scopes,
+indirect callback candidates and POSIX/loader evidence. Continue macOS work with:
 
 1. Continue CMake target/source completeness beyond the delivered normal-variable,
    directory/include-scope and auxiliary-source slice. Drive glob, generator-expression
@@ -419,9 +429,10 @@ The macOS C++ sequence after project file selection is:
    complete architecture extraction.
 3. Improve per-file/translation-unit completeness evidence and partial-result
    diagnostics. Missing compilation commands or failed units must remain visible
-   instead of implying that missing relations do not exist.
-4. Extend deterministic test registration evidence, beginning with concrete
-   Catch2 cases when needed. No name/path-based test classification; user-defined
+   instead of implying that missing relations do not exist. Strengthen typedef,
+   macro, callback-mutation and indirect resource-name handling from bounded cases.
+4. Extend deterministic test registration fixtures beyond the current GoogleTest
+   and Catch2 v3 cases. No name/path-based test classification; user-defined
    groups remain separate from Engine-backed test identity.
 
 Function-body control flow, data flow and execution ordering are deferred until

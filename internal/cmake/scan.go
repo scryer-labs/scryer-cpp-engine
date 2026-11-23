@@ -65,7 +65,15 @@ type IncludeDirectory struct {
 	Expression string `json:"expression"`
 }
 
+type RuntimeBinding struct {
+	Location
+	Command    string `json:"command"`
+	Expression string `json:"expression"`
+	Status     string `json:"status"`
+}
+
 type Facts struct {
+	RuntimeBindings      []RuntimeBinding     `json:"runtimeBindings,omitempty"`
 	IncludeDirectories   []IncludeDirectory   `json:"-"`
 	Sources              []TargetSource       `json:"-"`
 	Targets              []Target             `json:"targets"`

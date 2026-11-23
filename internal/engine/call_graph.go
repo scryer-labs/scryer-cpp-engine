@@ -56,6 +56,7 @@ type callSite struct {
 }
 
 type callGraph struct {
+	DynamicBindings  []dynamicBinding        `json:"dynamicBindings,omitempty"`
 	SymbolReferences []symbolReference       `json:"symbolReferences,omitempty"`
 	MacroExpansions  []macroExpansion        `json:"macroExpansions,omitempty"`
 	Completeness     *collectionCompleteness `json:"completeness,omitempty"`
