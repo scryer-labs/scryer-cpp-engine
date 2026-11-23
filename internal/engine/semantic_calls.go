@@ -151,7 +151,7 @@ func (g *callGraph) enclosingSymbol(index rangeIndex, site clangscan.Location, n
 	var best *functionSymbol
 	index.visit(site, func(i int) {
 		symbol := &g.Symbols[i]
-		if name != "" && symbol.baseName != name {
+		if name != "" && symbol.baseName != name && !(symbol.Kind == "macro-body" && symbol.Definition.Start == (position{Line: site.Line, Column: site.Column})) {
 			return
 		}
 		if best == nil || comparePosition(symbol.Definition.Start, best.Definition.Start) > 0 ||

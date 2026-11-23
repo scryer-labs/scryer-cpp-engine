@@ -14,3 +14,14 @@ func TestRegistrationRequiresCompilerIdentityAndFrameworkDeclaration(t *testing.
 		}
 	}
 }
+
+func TestCatchRegistrationRequiresCompilerConstructorAndHeader(t *testing.T) {
+	usr := "c:@N@Catch@S@AutoReg@F@AutoReg#arguments"
+	header := "/deps/catch2/internal/catch_test_registry.hpp"
+	if result := Registration(usr, header, "cases.cpp", 3, 1); result == nil || result.Evidence[0].Framework != "catch2" {
+		t.Fatal(result)
+	}
+	if Registration("AutoReg", header, "cases.cpp", 3, 1) != nil || Registration(usr, "/business/registry.hpp", "cases.cpp", 3, 1) != nil {
+		t.Fatal("accepted spelling without compiler/declaration evidence")
+	}
+}

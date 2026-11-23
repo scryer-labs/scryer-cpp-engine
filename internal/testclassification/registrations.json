@@ -3,5 +3,10 @@
     "framework": "googletest",
     "symbolUsrPrefix": "c:@N@testing@N@internal@F@MakeAndRegisterTestInfo#",
     "definitionSuffix": "/gtest/internal/gtest-internal.h"
+  },
+  {
+    "framework": "catch2",
+    "symbolUsrPrefix": "c:@N@Catch@S@AutoReg@F@AutoReg#",
+    "definitionSuffix": "/catch2/internal/catch_test_registry.hpp"
   }
 ]

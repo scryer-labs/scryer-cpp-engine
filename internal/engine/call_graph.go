@@ -25,6 +25,7 @@ func location(file string, node *sitter.Node) sourceRange {
 }
 
 type functionSymbol struct {
+	Projection        string                      `json:"projection,omitempty"`
 	Role              string                      `json:"role,omitempty"`
 	TestContext       *testclassification.Context `json:"testContext,omitempty"`
 	impactKey         string
@@ -53,12 +54,13 @@ type callSite struct {
 }
 
 type callGraph struct {
-	withImpact bool
-	Semantic   *semanticCallFacts `json:"semantic,omitempty"`
-	ProjectID  string             `json:"projectId"`
-	Basis      string             `json:"basis"`
-	Symbols    []functionSymbol   `json:"symbols"`
-	Calls      []callSite         `json:"calls"`
+	Completeness *collectionCompleteness `json:"completeness,omitempty"`
+	withImpact   bool
+	Semantic     *semanticCallFacts `json:"semantic,omitempty"`
+	ProjectID    string             `json:"projectId"`
+	Basis        string             `json:"basis"`
+	Symbols      []functionSymbol   `json:"symbols"`
+	Calls        []callSite         `json:"calls"`
 }
 
 type functionScope struct {
@@ -70,6 +72,7 @@ func (g *callGraph) collect(node *sitter.Node, file string, source []byte, scope
 	for len(scopes) > 0 && node.StartByte() >= scopes[len(scopes)-1].end {
 		scopes = scopes[:len(scopes)-1]
 	}
+	scopes = g.macroBody(node, file, source, scopes)
 	switch node.Kind() {
 	case "function_definition", "lambda_expression", "declaration":
 		variable := templateVariableName(node)

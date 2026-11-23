@@ -11,6 +11,7 @@ import (
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/clangscan"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/ipc"
+	"github.com/scryer-labs/scryer-cpp-engine/internal/preprocessor"
 	"github.com/scryer-labs/scryer-cpp-engine/internal/selection"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 	cpp "github.com/tree-sitter/tree-sitter-cpp/bindings/go"
@@ -29,6 +30,8 @@ type semanticFacts struct {
 }
 
 type sourceFacts struct {
+	macros         preprocessor.Catalog
+	parseRecovery  []string
 	api            []apiDeclaration
 	impactContexts []impactContext
 	resolution     *clangscan.Result
@@ -99,13 +102,16 @@ func scanSelectedSources(ctx context.Context, root string, includes, calls, ipcR
 		if tree == nil {
 			return fmt.Errorf("could not parse %s", file)
 		}
+		if tree.RootNode().HasError() {
+			facts.parseRecovery = append(facts.parseRecovery, file)
+		}
 		if impact {
 			context := tokenText(tree.RootNode(), source, true)
 			if context != "" {
 				facts.impactContexts = append(facts.impactContexts, impactContext{Path: file, Fingerprint: fmt.Sprintf("%x", sha256.Sum256([]byte(context)))})
 			}
 		}
-		if includes || calls {
+		if includes || calls || ipcRequested {
 			err = facts.collect(ctx, tree.RootNode(), file, source, includes, calls)
 		}
 		if err == nil && ipcRequested {
@@ -122,6 +128,7 @@ func scanSelectedSources(ctx context.Context, root string, includes, calls, ipcR
 	}
 	if err == nil && calls {
 		facts.graph.findCandidates()
+		facts.graph.recordCompleteness(facts.parseRecovery)
 	}
 	return facts, err
 }
@@ -144,6 +151,7 @@ func (facts *sourceFacts) collect(ctx context.Context, root *sitter.Node, file s
 			return err
 		}
 		node := cursor.Node()
+		facts.macros.Observe(node, file, source)
 		if includes {
 			if declaration, ok := observeAPI(node, file, source); ok {
 				facts.api = append(facts.api, declaration)

@@ -46,7 +46,7 @@ type Context struct {
 // framework declaration. A matching spelling alone supplies no classification.
 func Registration(usr, definition, file string, line, column uint) *Context {
 	for _, rule := range rules {
-		if strings.HasPrefix(usr, rule.SymbolUSRPrefix) && strings.HasSuffix(strings.ReplaceAll(definition, "\\", "/"), rule.DefinitionSuffix) {
+		if strings.HasPrefix(usr, rule.SymbolUSRPrefix) && strings.HasSuffix("/"+strings.TrimLeft(strings.ReplaceAll(definition, "\\", "/"), "/"), rule.DefinitionSuffix) {
 			return &Context{Scope: "test-only", Evidence: []Evidence{{
 				Kind: "compiler-test-registration", Framework: rule.Framework,
 				SymbolUSR: usr, DefinitionFile: definition, File: file, Line: line, Column: column,

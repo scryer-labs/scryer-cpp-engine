@@ -215,9 +215,10 @@ wrappers, rather than requiring a macro to be named `TEST`. A matching compiler
 USR and framework declaration at the macro-defined function's start are required.
 An ordinary function calling the registration API, a test-like filename, linked
 framework or helper call does not establish a test-only scope. Unknown roles
-remain unknown. Catch2 and other C++ test frameworks currently have no automatic
-test-role recognition rule. Their tests remain unclassified unless supported
-registration evidence is available; a test-like name does not change that.
+remain unknown. Catch2 v3 can now use compiler binding to its AutoReg constructor
+and framework declaration. Static macro-body scopes and other C++ frameworks
+remain unclassified without supported registration evidence; a test-like name,
+folder or macro spelling does not change that.
 This limitation concerns role classification, not the ability to run selected
 executables or collect their coverage. Other framework rules, build registrations
 and user-defined rules are deferred and can extend this Engine module.
@@ -393,8 +394,9 @@ are independent of Core's Markdown/HTML report resources.
   compiler pass requires usable host build inputs; inactive platform code,
   unavailable template instantiations, indirect dispatch and dynamic wrappers
   are not guaranteed to resolve.
-- Test-role registration currently supports GoogleTest evidence. Catch2 and
-  other framework rules are deferred; their executables can still run for coverage.
+- Test-role registration supports GoogleTest and Catch2 v3 compiler evidence.
+  Other frameworks and unresolved static macro bodies keep unknown roles; their
+  executables can still run for coverage.
 - Runtime coverage currently uses the documented macOS CMake/Apple LLVM path;
   other build systems/compiler coverage formats and Windows runtime acceptance
   are not implemented. Test-target names are exact, without fuzzy matching.

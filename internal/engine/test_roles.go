@@ -24,7 +24,7 @@ func (g *callGraph) classifyRegisteredTests(result *clangscan.Result, symbols ra
 		// Registration generated at a macro-defined function's start establishes
 		// that function's test role. A registration call inside an ordinary
 		// function does not make that function or its helpers test-only.
-		if symbol.Kind == "function" && symbol.Definition.Start == (position{Line: call.Site.Line, Column: call.Site.Column}) {
+		if (symbol.Kind == "function" || symbol.Kind == "macro-body") && symbol.Definition.Start == (position{Line: call.Site.Line, Column: call.Site.Column}) {
 			symbol.Role, symbol.TestContext = "TEST", evidence
 		}
 	}
