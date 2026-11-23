@@ -90,9 +90,29 @@ The `dependencies` fact contains two independent collections:
 - `cmake` records library and executable targets, aliases, link declarations,
   external dependency declarations and subdirectories from `CMakeLists.txt`
   and `*.cmake` files. Each record includes its file and line. Conditional
-  declarations carry their textual control-flow context. Dynamic names, link
-  items and other supported arguments that require evaluation are recorded in
-  `unresolved`.
+  declarations carry their textual control-flow context. Names and source/link
+  operands are expanded when the bounded model knows their values; expressions
+  requiring unsupported evaluation stay in `unresolved`.
+
+The static model follows selected `add_subdirectory` and explicit local `include`
+files in declaration order. `project`, normal `set` bindings, semicolon lists and
+known-list `list(APPEND/PREPEND)` can supply target names, sources, include paths
+and link operands. Child directories inherit a copy of parent variables; includes
+share the caller's scope while preserving their actual source-directory context.
+Known source/list directory builtins are supported. `aux_source_directory` lists
+selected direct C/C++ sources without recursion, including `.c` files. Excluded
+files cannot re-enter through source enumeration.
+
+Branches remain unevaluated declarations with their textual context. After an
+`if`, only values identical across all alternatives stay known; a missing `else`
+also includes the incoming state. Cache/environment inputs, parent-scope writes,
+custom commands, loops and unsupported mutations do not establish known values.
+File GLOB/GLOB_RECURSE, general generator expressions, system/module-path lookup,
+function/macro execution and generated-source evaluation remain unsupported.
+A variable receiving an unsupported glob result is invalidated instead of reusing
+its previous value. Missing selected listfiles and disconnected fragments retain
+diagnostics; fragments are still scanned independently without inferred parent
+variables. These are source declarations, not an effective configured build.
 
 The scan reads declarations without configuring a CMake build or fetching
 dependencies. Link operands can name targets, libraries, paths or flags.
@@ -101,8 +121,10 @@ connect the two datasets. Declarations may appear in inactive branches or in
 files that a particular build does not load.
 
 `architecture` returns the components and link declarations visible in CMake,
-with source locations and project-scoped component IDs. Link endpoints use
-canonical component IDs even when the original operand is an alias. Components
+with source locations and project-scoped component IDs. Resolved variable target
+names use the same existing component/link shape; file and IPC entrypoint
+memberships use the invocation source directory even inside an included script.
+Link endpoints use canonical component IDs even when the original operand is an alias. Components
 list their unambiguous aliases and alias declarations preserve source locations
 and any candidate IDs. Conditional or unresolved CMake inputs remain declarations.
 
@@ -337,7 +359,7 @@ See the [impact contract](https://github.com/scryer-labs/scryer/blob/main/docs/c
 |---|---|
 | `cmd/cpp-engine-abi` | Thin C ABI v1 entry point, execution/cancellation and response buffers |
 | `internal/engine` | Request dispatch, fact assembly, source identities and scan-to-impact projection |
-| `internal/cmake` | Independent static CMake declaration collection |
+| `internal/cmake` | Independent declaration model, directory/listfile scopes, variable expansion and selected source lists |
 | `internal/selection` | Validate Core-owned file inventories and selection receipts |
 | `internal/clangscan` | Optional libclang loading, compilation databases and compiler evidence |
 | `internal/ipc` | Windows named-pipe/shared-memory observations and bounded source traces |
@@ -378,9 +400,10 @@ are independent of Core's Markdown/HTML report resources.
 
 The macOS C++ sequence after project file selection is:
 
-1. Improve CMake target/source relationships, starting with concrete variable
-   expansion gaps. Retain unresolved generator expressions and conditional inputs;
-   keep build-model collection independent from C/C++ parsing.
+1. Continue CMake target/source completeness beyond the delivered normal-variable,
+   directory/include-scope and auxiliary-source slice. Drive glob, generator-expression
+   and custom-factory support from concrete evidence; retain unknown configuration
+   inputs and keep build collection independent from C/C++ parsing.
 2. Verify large real repositories with explicit include/exclude scope. Measure
    time, memory and output size, and inspect missing/false target memberships,
    include links and cross-file calls. A completed JSON export is not proof of
