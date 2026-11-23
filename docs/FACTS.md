@@ -71,7 +71,7 @@ complex macro expansion, conditional preprocessing and mutations can prevent or
 broaden projection. Static impact preserves these candidates and their basis;
 compiler-resolved impact continues to use compiler targets exclusively.
 
-## POSIX communication and dynamic loader evidence (source development)
+## POSIX communication and dynamic loader evidence (v0.4.0)
 
 The `ipc` fact adds `posix.unixSocket` and `posix.sharedMemory`. Each mechanism
 contains `observations[]` (including unresolved operations) and `endpoints[]`

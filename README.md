@@ -16,7 +16,10 @@ separate modules.
 ## Install and scan
 
 Engine ID: `cpp`. Official packages cover macOS arm64 and Windows amd64.
-Version 0.3.0 adds Core-owned project file selection and selection receipts.
+Version 0.4.0 adds the bounded CMake declaration model, header provider candidates,
+macro callable scopes, indirect callback candidates, POSIX resource observations
+and dynamic loader declarations. Version 0.3.0 introduced Core-owned project
+file selection and selection receipts.
 Use the updated Core with `scanFileSelection` support when configuring project
 include/exclude rules. Existing unconfigured scans remain unchanged.
 Install a missing engine or upgrade an installed one with the current Scryer CLI:
@@ -84,7 +87,7 @@ header-only projects without those detected languages remain a dispatch limitati
 ## Facts
 
 See [C++ fact extensions](docs/FACTS.md) for additive evidence and consumer rules.
-Source development after v0.3.0 adds evidence-based header provider candidates,
+Version 0.4.0 adds evidence-based header provider candidates,
 macro-body source scopes, indirect callback candidates, POSIX API observations
 and dynamic loader declarations. These are bounded evidence, not complete
 preprocessing, concrete pointer dispatch or observed execution.
@@ -100,10 +103,10 @@ The `dependencies` fact contains two independent collections:
   operands are expanded when the bounded model knows their values; expressions
   requiring unsupported evaluation stay in `unresolved`.
 
-### CMake declaration model (unreleased)
+### CMake declaration model (v0.4.0)
 
-The expanded model below is available from source after v0.3.0. The published
-v0.3.0 package includes project file selection but not this model enhancement.
+The expanded model below is included in v0.4.0. The older v0.3.0 package
+includes project file selection but not this model enhancement.
 
 The static model follows selected `add_subdirectory` and explicit local `include`
 files in declaration order. `project`, normal `set` bindings, semicolon lists and
