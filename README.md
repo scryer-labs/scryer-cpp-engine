@@ -94,6 +94,11 @@ The `dependencies` fact contains two independent collections:
   operands are expanded when the bounded model knows their values; expressions
   requiring unsupported evaluation stay in `unresolved`.
 
+### CMake declaration model (unreleased)
+
+The expanded model below is available from source after v0.3.0. The published
+v0.3.0 package includes project file selection but not this model enhancement.
+
 The static model follows selected `add_subdirectory` and explicit local `include`
 files in declaration order. `project`, normal `set` bindings, semicolon lists and
 known-list `list(APPEND/PREPEND)` can supply target names, sources, include paths
