@@ -55,3 +55,18 @@ sharing Catch2 names are not silently classified as Catch2.
 Tree-sitter recovery can come from valid macros or unsupported syntax; it is not
 proof of a compile error. Global initializers can legitimately lack a caller.
 Source grouping is neither full macro expansion nor execution-order evidence.
+
+## Macro and function-pointer candidates
+
+Calls may include `candidateSymbolIds[]` and `candidateBasis` (`macro-forwarding`
+or `struct-field-initializer`). The original call site and expression remain.
+Simple macro forwarding preserves its definition location in `macroExpansions[]`.
+`symbolReferences[]` records function-valued arguments and struct initializer
+bindings, with source range, expression, candidate IDs and applicable struct/field.
+
+Typed struct field chains can use observed function-pointer initializers as
+candidates. All compatible observed initializers remain possible; this is not
+object-sensitive analysis. Conflicting struct layouts, unresolved typedefs,
+complex macro expansion, conditional preprocessing and mutations can prevent or
+broaden projection. Static impact preserves these candidates and their basis;
+compiler-resolved impact continues to use compiler targets exclusively.

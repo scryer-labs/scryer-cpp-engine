@@ -41,6 +41,8 @@ type functionSymbol struct {
 }
 
 type callSite struct {
+	CandidateIDs    []string `json:"candidateSymbolIds,omitempty"`
+	CandidateBasis  string   `json:"candidateBasis,omitempty"`
 	ID              string   `json:"callSiteId"`
 	SemanticEdgeIDs []string `json:"semanticEdgeIds,omitempty"`
 	name            string
@@ -54,13 +56,15 @@ type callSite struct {
 }
 
 type callGraph struct {
-	Completeness *collectionCompleteness `json:"completeness,omitempty"`
-	withImpact   bool
-	Semantic     *semanticCallFacts `json:"semantic,omitempty"`
-	ProjectID    string             `json:"projectId"`
-	Basis        string             `json:"basis"`
-	Symbols      []functionSymbol   `json:"symbols"`
-	Calls        []callSite         `json:"calls"`
+	SymbolReferences []symbolReference       `json:"symbolReferences,omitempty"`
+	MacroExpansions  []macroExpansion        `json:"macroExpansions,omitempty"`
+	Completeness     *collectionCompleteness `json:"completeness,omitempty"`
+	withImpact       bool
+	Semantic         *semanticCallFacts `json:"semantic,omitempty"`
+	ProjectID        string             `json:"projectId"`
+	Basis            string             `json:"basis"`
+	Symbols          []functionSymbol   `json:"symbols"`
+	Calls            []callSite         `json:"calls"`
 }
 
 type functionScope struct {

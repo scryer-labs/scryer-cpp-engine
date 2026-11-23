@@ -30,6 +30,7 @@ type semanticFacts struct {
 }
 
 type sourceFacts struct {
+	indirect       indirectModel
 	macros         preprocessor.Catalog
 	parseRecovery  []string
 	api            []apiDeclaration
@@ -128,6 +129,7 @@ func scanSelectedSources(ctx context.Context, root string, includes, calls, ipcR
 	}
 	if err == nil && calls {
 		facts.graph.findCandidates()
+		facts.graph.linkIndirect(&facts.indirect, &facts.macros)
 		facts.graph.recordCompleteness(facts.parseRecovery)
 	}
 	return facts, err
@@ -164,6 +166,7 @@ func (facts *sourceFacts) collect(ctx context.Context, root *sitter.Node, file s
 		}
 		if calls {
 			scopes = facts.graph.collect(node, file, source, scopes)
+			facts.indirect.observe(node, file, source, scopes)
 		}
 		if cursor.GotoFirstChild() {
 			continue

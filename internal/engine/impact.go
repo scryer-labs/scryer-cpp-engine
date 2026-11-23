@@ -35,14 +35,16 @@ type impactContext struct {
 }
 
 type impactCall struct {
-	Kind       string      `json:"kind,omitempty"`
-	ID         string      `json:"callSiteId"`
-	Caller     string      `json:"callerSymbolId,omitempty"`
-	Candidate  string      `json:"candidateSymbolId,omitempty"`
-	Target     string      `json:"targetSymbolId,omitempty"`
-	Callee     string      `json:"callee"`
-	Resolution string      `json:"resolution"`
-	Site       sourceRange `json:"site"`
+	Kind           string      `json:"kind,omitempty"`
+	ID             string      `json:"callSiteId"`
+	Caller         string      `json:"callerSymbolId,omitempty"`
+	Candidates     []string    `json:"candidateSymbolIds,omitempty"`
+	CandidateBasis string      `json:"candidateBasis,omitempty"`
+	Candidate      string      `json:"candidateSymbolId,omitempty"`
+	Target         string      `json:"targetSymbolId,omitempty"`
+	Callee         string      `json:"callee"`
+	Resolution     string      `json:"resolution"`
+	Site           sourceRange `json:"site"`
 }
 
 type impactSnapshot struct {
@@ -170,7 +172,7 @@ func collectSelectedImpactSnapshot(ctx context.Context, root string, resolve boo
 		}
 	} else {
 		for _, call := range graph.Calls {
-			result.Calls = append(result.Calls, impactCall{ID: call.ID, Caller: call.CallerID, Candidate: call.CandidateID, Callee: call.Callee, Resolution: call.Resolution, Site: call.Site})
+			result.Calls = append(result.Calls, impactCall{ID: call.ID, Caller: call.CallerID, Candidate: call.CandidateID, Candidates: call.CandidateIDs, CandidateBasis: call.CandidateBasis, Callee: call.Callee, Resolution: call.Resolution, Site: call.Site})
 		}
 	}
 	return result, nil
