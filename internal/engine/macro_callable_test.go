@@ -53,3 +53,22 @@ UNKNOWN_CASE("custom") { verify(); }
 		t.Fatal(facts.graph.Completeness)
 	}
 }
+
+func TestMacroBodyDoesNotPromoteRecoveredCrossFunctionRanges(t *testing.T) {
+	root := t.TempDir()
+	source := `void previous(){tmlog(INFO,"normal delay %"PRId64", left %"PRId64"\n", job->period_delay, pb.left);}
+static bool job_is_done(struct job *job){return check(job);}
+`
+	if err := os.WriteFile(filepath.Join(root, "source.c"), []byte(source), 0600); err != nil {
+		t.Fatal(err)
+	}
+	facts, err := scanSources(context.Background(), root, false, true, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, symbol := range facts.graph.Symbols {
+		if symbol.Kind == "macro-body" {
+			t.Fatalf("source recovery crossed a function: %+v", symbol)
+		}
+	}
+}

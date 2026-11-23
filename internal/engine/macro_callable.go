@@ -31,7 +31,7 @@ func (g *callGraph) macroBody(node *sitter.Node, file string, source []byte, sco
 		return scopes
 	}
 	call := previous.NamedChild(0)
-	if call == nil || call.Kind() != "call_expression" {
+	if call == nil || call.Kind() != "call_expression" || call.HasError() {
 		return scopes
 	}
 	name := call.ChildByFieldName("function")
