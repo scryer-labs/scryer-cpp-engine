@@ -13,10 +13,11 @@ type membership struct {
 }
 
 type sourceFile struct {
-	Path               string       `json:"path"`
-	ComponentIDs       []string     `json:"componentIds"`
-	SearchComponentIDs []string     `json:"searchComponentIds,omitempty"`
-	Memberships        []membership `json:"memberships,omitempty"`
+	Ownership          *fileOwnership `json:"ownership,omitempty"`
+	Path               string         `json:"path"`
+	ComponentIDs       []string       `json:"componentIds"`
+	SearchComponentIDs []string       `json:"searchComponentIds,omitempty"`
+	Memberships        []membership   `json:"memberships,omitempty"`
 }
 
 type fileReference struct {
@@ -70,6 +71,7 @@ func describeFiles(root string, build cmake.Facts, source sourceFacts) filesRepo
 		ref := resolveInclude(include, result.Files[byPath[include.File]].SearchComponentIDs, byPath, search)
 		result.References = append(result.References, ref)
 	}
+	describeOwnership(&result, source.api, search)
 	return result
 }
 

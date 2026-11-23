@@ -29,6 +29,7 @@ type semanticFacts struct {
 }
 
 type sourceFacts struct {
+	api            []apiDeclaration
 	impactContexts []impactContext
 	resolution     *clangscan.Result
 	files          []string
@@ -143,6 +144,11 @@ func (facts *sourceFacts) collect(ctx context.Context, root *sitter.Node, file s
 			return err
 		}
 		node := cursor.Node()
+		if includes {
+			if declaration, ok := observeAPI(node, file, source); ok {
+				facts.api = append(facts.api, declaration)
+			}
+		}
 		if includes && node.Kind() == "preproc_include" {
 			if target := node.ChildByFieldName("path"); target != nil {
 				facts.includes = append(facts.includes, Include{File: file, Line: node.StartPosition().Row + 1, Target: target.Utf8Text(source), Column: target.StartPosition().Column + 1})

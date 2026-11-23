@@ -83,6 +83,8 @@ header-only projects without those detected languages remain a dispatch limitati
 
 ## Facts
 
+See [C++ fact extensions](docs/FACTS.md) for additive evidence and consumer rules.
+
 The `dependencies` fact contains two independent collections:
 
 - `includes` records C and C++ include directives with a repository-relative
