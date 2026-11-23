@@ -49,7 +49,7 @@ add_subdirectory("sub folder")
 		!reflect.DeepEqual(facts.Links[0].Context, []string{"if(WIN32 AND ( MSVC OR MINGW ))"}) {
 		t.Fatalf("unexpected links: %+v", facts.Links)
 	}
-	if len(facts.Unresolved) != 3 || facts.Unresolved[1].Target != "app" ||
+	if len(facts.Unresolved) != 4 || facts.Unresolved[1].Target != "app" ||
 		facts.Unresolved[1].Expression != "${VAR}" || !strings.HasPrefix(facts.Unresolved[2].Expression, "$<IF:") {
 		t.Fatalf("unexpected unresolved facts: %+v", facts.Unresolved)
 	}

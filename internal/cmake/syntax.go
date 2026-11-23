@@ -9,6 +9,8 @@ type argument struct {
 	text    string
 	line    int
 	bracket bool
+	quoted  bool
+	invalid bool
 }
 
 type invocation struct {
@@ -154,6 +156,7 @@ func (l *lexer) argument() (argument, error) {
 
 	start := l.pos
 	quoted := l.source[l.pos] == '"'
+	arg.quoted = quoted
 	insideQuotes := quoted
 	if quoted {
 		l.take()

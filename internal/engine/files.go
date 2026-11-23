@@ -48,7 +48,7 @@ func describeFiles(root string, build cmake.Facts, source sourceFacts) filesRepo
 		result.Files = append(result.Files, sourceFile{Path: file, ComponentIDs: []string{}})
 	}
 	for _, source := range build.Sources {
-		file := path.Join(path.Dir(source.File), source.Path)
+		file := source.ProjectPath()
 		index, exists := byPath[file]
 		if !exists {
 			continue

@@ -43,7 +43,7 @@ func indexIncludePaths(root string, build cmake.Facts) *includePaths {
 
 func sourceIncludePath(root string, declaration cmake.IncludeDirectory) (string, bool) {
 	// An included script can run from a different CMake source directory.
-	if path.Base(declaration.File) != "CMakeLists.txt" {
+	if declaration.SourceDirectory == "" && path.Base(declaration.File) != "CMakeLists.txt" {
 		return "", false
 	}
 	value := declaration.Expression
@@ -54,7 +54,11 @@ func sourceIncludePath(root string, declaration cmake.IncludeDirectory) (string,
 		}
 		value = strings.TrimSuffix(strings.TrimPrefix(value, "$<BUILD_INTERFACE:"), ">")
 	}
-	sourceDir := filepath.Join(root, filepath.FromSlash(path.Dir(declaration.File)))
+	directory := declaration.SourceDirectory
+	if directory == "" {
+		directory = path.Dir(declaration.File)
+	}
+	sourceDir := filepath.Join(root, filepath.FromSlash(directory))
 	for _, variable := range []struct{ name, directory string }{
 		{"${CMAKE_CURRENT_SOURCE_DIR}", sourceDir},
 		{"${CMAKE_SOURCE_DIR}", root},

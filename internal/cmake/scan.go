@@ -4,17 +4,15 @@ package cmake
 import (
 	"context"
 	"fmt"
-	"io"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 )
 
 type Location struct {
-	File    string   `json:"file"`
-	Line    int      `json:"line"`
-	Context []string `json:"context,omitempty"`
+	SourceDirectory string   `json:"-"`
+	File            string   `json:"file"`
+	Line            int      `json:"line"`
+	Context         []string `json:"context,omitempty"`
 }
 
 type Target struct {
@@ -77,133 +75,10 @@ type Facts struct {
 	Unresolved           []Unresolved         `json:"unresolved"`
 }
 
-func Scan(ctx context.Context, root string) (Facts, error) {
-	facts := Facts{
-		Targets: []Target{}, Links: []Link{}, ExternalDependencies: []ExternalDependency{},
-		Subdirectories: []Subdirectory{}, Unresolved: []Unresolved{},
-	}
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if path != root && entry.IsDir() {
-			switch entry.Name() {
-			case ".git", "CMakeFiles", "_deps":
-				return filepath.SkipDir
-			}
-			if _, err := os.Stat(filepath.Join(path, "CMakeCache.txt")); err == nil {
-				return filepath.SkipDir
-			}
-		}
-		if !entry.Type().IsRegular() || (entry.Name() != "CMakeLists.txt" && !strings.HasSuffix(entry.Name(), ".cmake")) {
-			return nil
-		}
-		source, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		file, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		return facts.scanFile(ctx, filepath.ToSlash(file), strings.TrimPrefix(string(source), "\uFEFF"))
-	})
-	return facts, err
-}
-
-// ScanFiles reads only explicitly selected build files. CMake remains independent
-// of the source parser and of Core's project configuration format.
-func ScanFiles(ctx context.Context, root string, files []string) (Facts, error) {
-	facts := Facts{Targets: []Target{}, Links: []Link{}, ExternalDependencies: []ExternalDependency{}, Subdirectories: []Subdirectory{}, Unresolved: []Unresolved{}}
-	directory, err := os.OpenRoot(root)
-	if err != nil {
-		return facts, err
-	}
-	defer directory.Close()
-	for _, name := range files {
-		if err = ctx.Err(); err != nil {
-			return facts, err
-		}
-		if filepath.Base(name) != "CMakeLists.txt" && !strings.HasSuffix(name, ".cmake") {
-			continue
-		}
-		file, err := directory.Open(filepath.FromSlash(name))
-		if err != nil {
-			return facts, err
-		}
-		data, readErr := io.ReadAll(file)
-		closeErr := file.Close()
-		if readErr != nil {
-			return facts, readErr
-		}
-		if closeErr != nil {
-			return facts, closeErr
-		}
-		if err = facts.scanFile(ctx, name, strings.TrimPrefix(string(data), "\uFEFF")); err != nil {
-			return facts, err
-		}
-	}
-	return facts, nil
-}
-
-type block struct {
-	kind     string
-	branches []string
-}
-
+// scanFile retains the standalone parser entry point for focused syntax tests.
 func (f *Facts) scanFile(ctx context.Context, file, source string) error {
-	reader := lexer{source: source, line: 1}
-	var blocks []block
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		cmd, ok, err := reader.next()
-		if err != nil {
-			location := Location{File: file, Line: max(cmd.line, reader.line)}
-			f.Unresolved = append(f.Unresolved, Unresolved{Location: location, Command: cmd.name, Reason: err.Error()})
-			return nil
-		}
-		if !ok {
-			return nil
-		}
-		context := []string{}
-		for _, block := range blocks {
-			context = append(context, block.branches...)
-		}
-		location := Location{File: file, Line: cmd.line, Context: context}
-		switch cmd.name {
-		case "if", "foreach", "while", "function", "macro", "block":
-			blocks = append(blocks, block{kind: cmd.name, branches: []string{cmd.expression()}})
-			f.unresolved(location, cmd, cmd.expression(), "control flow is not evaluated")
-		case "elseif", "else":
-			if len(blocks) > 0 && blocks[len(blocks)-1].kind == "if" {
-				current := &blocks[len(blocks)-1]
-				current.branches = append(current.branches, cmd.expression())
-			}
-		case "endif", "endforeach", "endwhile", "endfunction", "endmacro", "endblock":
-			if len(blocks) > 0 && blocks[len(blocks)-1].kind == strings.TrimPrefix(cmd.name, "end") {
-				blocks = blocks[:len(blocks)-1]
-			}
-		case "add_library", "add_executable":
-			f.target(location, cmd)
-		case "target_include_directories":
-			f.includeDirectories(location, cmd)
-		case "target_sources":
-			f.targetSources(location, cmd)
-		case "target_link_libraries":
-			f.links(location, cmd)
-		case "find_package", "fetchcontent_declare", "externalproject_add":
-			f.external(location, cmd)
-		case "add_subdirectory":
-			if path, ok := f.first(location, cmd); ok {
-				f.Subdirectories = append(f.Subdirectories, Subdirectory{Location: location, Path: path})
-			}
-		}
-	}
+	model := newModel(".", nil, map[string]string{file: source}, f)
+	return model.scanFile(ctx, file, filepath.ToSlash(filepath.Dir(file)), environment{}, nil)
 }
 
 func (cmd invocation) expression() string {
@@ -219,6 +94,9 @@ func (f *Facts) unresolved(loc Location, cmd invocation, expression, reason stri
 }
 
 func (arg argument) literal() bool {
+	if arg.invalid {
+		return false
+	}
 	if arg.bracket {
 		return arg.text != "" && !strings.ContainsAny(arg.text, ";\r\n") && !strings.Contains(arg.text, "$<")
 	}
@@ -294,16 +172,12 @@ func (f *Facts) targetSources(loc Location, cmd invocation) {
 }
 
 func (f *Facts) addSources(loc Location, target string, args []argument) {
-	// Relative paths in included scripts depend on their invocation context.
-	if filepath.Base(loc.File) != "CMakeLists.txt" {
-		return
-	}
 	for _, arg := range args {
 		switch arg.text {
 		case "PRIVATE", "PUBLIC", "INTERFACE":
 			continue
 		}
-		if arg.literal() && filepath.IsLocal(filepath.FromSlash(arg.text)) {
+		if arg.literal() && !filepath.IsAbs(filepath.FromSlash(arg.text)) {
 			loc.Line = arg.line
 			f.Sources = append(f.Sources, TargetSource{Location: loc, Target: target, Path: arg.text})
 		}

@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"path"
 	"slices"
 
 	"github.com/scryer-labs/scryer-cpp-engine/internal/cmake"
@@ -17,7 +16,7 @@ func attachIPCComponents(facts *ipc.Facts, build cmake.Facts) {
 	}
 	bySource := make(map[string][]string)
 	for _, source := range build.Sources {
-		file := path.Join(path.Dir(source.File), source.Path)
+		file := source.ProjectPath()
 		for _, id := range executables[source.Target] {
 			if !slices.Contains(bySource[file], id) {
 				bySource[file] = append(bySource[file], id)
