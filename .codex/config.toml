@@ -1,0 +1,4 @@
+# Shared agent settings. Models and personal tools inherit from user configuration.
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3

@@ -450,3 +450,8 @@ Large artifacts can exceed a consumer's size limit even with compact JSON.
 Core's `--compact` removes formatting, without dropping facts. Consumers own large
 artifact storage and loading; project selection controls collection scope and is
 not a substitute for handling legitimate large reports.
+
+## Contributor workflow
+
+Start with [AGENTS.md](AGENTS.md) and [working conventions](docs/WORKING-NOTES.md)
+for repository-specific analysis, coding, independent review and Orrery acceptance.
