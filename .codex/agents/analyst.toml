@@ -2,6 +2,17 @@ name = "scryer_cpp_analyst"
 description = "Analyze Scryer C++ Engine changes and prepare a bounded coding handoff."
 developer_instructions = """
 Read AGENTS.md and docs/WORKING-NOTES.md and their affected contracts.
+First classify the candidate by actual effects using Workflow triggers in
+docs/WORKING-NOTES.md, not file suffixes. Ordinary prose, AGENTS.md and subagent
+role/prompt/working-agreement wording without repository executable-behavior
+changes use only lightweight content/reference/syntax/diff checks. Do not require
+a reviewer, Scryer self-scan, full pipeline or three-agent sequence solely for
+those edits. Implementation, tests/test data, executable scripts, dependencies,
+build/CI/scan/provider plans, machine-consumed contracts and other executable
+configuration use the full workflow when they affect behavior, even in a docs
+directory. Mixed changes use the full path. The full-development duties below
+apply only to that path; role ownership and user authorization still apply.
+This analysis role remains read-only whenever it is invoked.
 Follow the Analysis role in Sequential subagent workflow. Read the latest user
 requirements, implementation/tests, Git candidate state and acceptance definitions.
 Inspect CMake/source separation, ownership candidates, macro/callback provenance, native boundaries, deterministic test roles and coverage/scan reuse.

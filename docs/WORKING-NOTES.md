@@ -34,7 +34,34 @@ Go tests use `Test_should_xxx_when_xxx` where applicable. Commit subjects use
 `chore` or `revert`. Choose the primary purpose, keep summaries concise, preserve
 unrelated work and do not rewrite history without explicit user instruction.
 
+## Workflow triggers
+
+Classify the candidate by its actual effect, not its filename or directory.
+The full analysis → coding → independent review workflow applies when changes
+affect repository build, test, execution or runtime behavior, including:
+
+- implementation, tests or test data;
+- executable scripts, dependencies, build or CI configuration;
+- scan/provider plans, executable configuration or machine-consumed contracts;
+- executable or generation logic located inside documentation directories.
+
+Mixed behavior-changing and prose changes use the full workflow. Coding and the
+final independent reviewer run the existing complete acceptance entries for the
+final candidate. The two independent source/scan tracks below remain required
+for that path. Do not treat every configuration file as lightweight.
+
+Ordinary prose, `AGENTS.md`, subagent role descriptions/prompts and working
+agreements, and other content without repository executable-behavior changes use
+the [lightweight path](#lightweight-path). Role TOML prompt wording alone is not a
+product implementation change. A `.md`, `.toml`, `.yaml` or `.json` suffix does
+not decide the path. Inspect ambiguous effects before classifying; if executable
+behavior is discovered, promote the candidate to the full workflow. Report the
+classification and checks actually performed.
+
 ## Sequential subagent workflow
+
+For candidates that trigger the full workflow above, use the following stages.
+Lightweight changes do not require these subagents, scans or complete plans.
 
 The primary agent owns user discussion, requirement boundaries, coordination,
 questions, ownership assignments and the final report. It coordinates the roles
@@ -89,6 +116,9 @@ reviewed repositories, not in shared role/configuration files or committed histo
 A workspace-local `.orrery/reviews/` directory is one possible location.
 
 ## Reviewer source and scan tracks
+
+This section applies only to full-workflow candidates. Lightweight changes do
+not require a reviewer or Scryer scan.
 
 Use two independent evidence tracks bound to the same candidate. Neither an
 AI/source inventory nor scanner output is presumed correct. Self-scanning is
@@ -211,26 +241,30 @@ authorization to known effects; request clarification only for a necessary effec
 that is not already authorized. Ordinary read-only inspection and formatting are
 allowed. Release publication remains separate from local package verification.
 
-## Documentation and agent-role configuration only
+## Lightweight path
 
-For changes limited to documentation and `.codex` agent-role/settings files,
-validate TOML syntax/reference schema, role names and duties, local links,
-acceptance IDs/targets against current definitions, Git visibility and the
-changed-file allowlist; run `git diff --check`. Independently review the actual
-text/configuration and preserve candidate/validation evidence. Reviewer self-scan
-still applies when available, with its inability to validate workflow prose
-reported explicitly. No unconditional full product pipeline is required for this
-slice; do not claim these checks as code-pipeline acceptance.
+For the non-executable changes defined in Workflow triggers, the primary agent
+may make the edits directly. Check content consistency, document references,
+relevant configuration syntax and diff formatting (`git diff --check`). Confirm
+the diff contains no implementation or executable-configuration change, preserve
+unrelated work and report the actual changed files and checks.
 
-This exception does not cover product/runtime configuration, manifests such as
-`engine.json`, `.scryer` behavior, build/package scripts, CI or executable behavior.
-Those changes require their applicable complete acceptance plans. If a slice
-mixes documentation with behavior changes, use the implementation workflow.
+Do not start a reviewer, Scryer self-scan, full acceptance pipeline or mandatory
+three-agent sequence solely for these edits. No independent review or source/scan
+reconciliation is required for this lightweight path. With user authorization,
+commit and push after the required lightweight checks pass; do not invent a full
+pipeline verdict for those checks.
+
+This is not an exception for all configuration files. Changes to actual commands,
+dependencies, tests/fixtures, build/package/CI logic, scan/provider plans, runtime
+configuration, machine-consumed contracts or generated/executed behavior require
+the full workflow when they affect repository behavior, even in a documentation
+directory. Mixed candidates use the full path.
 
 ## Repository acceptance entries
 
 Both coding and final independent review use the following complete entries for
-implementation changes. Review reruns acceptance on its final accepted candidate.
+changes that trigger the full workflow. Review reruns acceptance on its final accepted candidate.
 
 | Entry | Existing plan ID | Effective target |
 | --- | --- | --- |
