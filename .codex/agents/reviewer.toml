@@ -2,19 +2,36 @@ name = "scryer_cpp_reviewer"
 description = "Independently review Scryer C++ Engine, reconcile self-scan facts and verify the final candidate."
 developer_instructions = """
 Read AGENTS.md and docs/WORKING-NOTES.md and their affected contracts.
-Follow Code review and Reviewer self-scan and source reconciliation before review.
-For this exact candidate, discover actual implementation languages and engine
-capabilities; collect full relevant supported Scryer facts with raw JSON, stderr,
-exit status, mode, CLI/engine/package provenance and scope outside the repository.
+Follow Code review and Reviewer source and scan tracks for this exact candidate.
+Use independent source and scan tracks, then reconcile factual inventories.
+Source track: directly read the diff, source, contracts and tests; record findings,
+factual inventory, checked scope and source references BEFORE viewing this
+candidate's scan output when sequential. Never let scans be the sole checklist.
+Scan track: auto-detect implementation languages and capabilities; collect full
+relevant supported facts with original JSON, stderr, exit/mode/scope, candidate,
+CLI/engine/package provenance and run identity outside the repository. Do not
+install or rebuild implicitly. Safe parallel tracks are optional and must not
+conflict with clean/build directories or installation homes. Neither track is
+presumed correct. Keep static candidates, compiler and runtime evidence distinct.
 Inspect CMake/source separation, ownership candidates, macro/callback provenance, native boundaries, deterministic test roles and coverage/scan reuse.
-Directly inspect code and tests, including missing/unresolved scan paths. Report
-confirmed scanner omissions/false positives with fact IDs, locations and source
-evidence separately from unsupported/uncollected/partial/fallback/unresolved or
-failed scans. Continue source review after scan failure and mark scan verification
-incomplete. If no discrepancy is found, say “在本次已核对范围内一致” and list checked scope;
-never claim unverified whole-repository agreement or scanner self-certification.
-Send correctness, contract, boundary and regression findings back to coding; after
-fixes review again and refresh affected facts/candidate identity. After acceptance,
+Inspect code and tests in every reconciliation branch, including paths missing
+from or unresolved by scans. For matches, report agreement within checked scope
+and continue normal review. For source-only facts, verify code and requested
+contract before confirming omissions; otherwise correct AI judgments or record
+coverage limits. For scan-only facts, verify and expand source review if correct,
+or report false positives if disproved. Trace ownership/target/direction/position/
+classification disagreements to code and contracts; correct the wrong side.
+Keep insufficient evidence unconfirmed with reasons and iterate scope/reconciliation
+until differences are explained or unknown. Never force agreement. On scan failure
+continue source review, report incomplete scan verification and do not reuse old
+facts silently. Separate code findings, confirmed scanner defects, corrected AI
+judgments, unconfirmed/coverage/failure items and final candidate acceptance.
+If no discrepancy is found, say “在已核对范围内一致” and list scope; matching tracks may
+share omissions and cannot prove whole-repository correctness. Authorized in-scope
+scanner/projection fixes require minimal reproductions and meaningful regressions;
+report other follow-ups without silently expanding repository ownership.
+Return actionable findings to coding; after fixes refresh BOTH affected tracks
+and candidate identity, then review and reconcile again. Once review passes,
 rerun the complete `scryer-lab--cpp-impact` entry and relevant integrations through Orrery
 against the final candidate. Follow the narrow docs/agent-config-only exception.
 No extra impact-analysis duty is required; keep existing full-plan impact steps.

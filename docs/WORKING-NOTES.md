@@ -49,15 +49,17 @@ automatically enforced pipeline. Do not parallelize dependent phases.
    regression tests and runs this repository's complete acceptance entry below.
    Deliver the diff, candidate identity, exact plan/run evidence and limitations.
    Do not commit before independent review, and do not push.
-3. **Code review** is independent of coding. First collect fresh self-scan evidence
-   as below, then directly inspect implementation and tests against requirements,
-   contracts, responsibilities and regression risks. Send actionable findings to
-   coding rather than silently rewriting implementation. After fixes, review
-   again and refresh affected scans. Once review passes, rerun the complete
-   acceptance entry against the final candidate. Only with user commit
-   authorization and passing final review/acceptance, make small commits and
-   report hashes, key changes, evidence and remaining limits. Explicit user
-   authorization is separately required for push.
+3. **Code review** is independent of coding. Build source-review observations and
+   fresh Scryer facts in two independent tracks for the same candidate, then
+   reconcile their factual inventories as below. Directly inspect implementation
+   and tests against requirements, contracts, responsibilities and regression
+   risks in every comparison branch. Send actionable findings to coding rather
+   than silently rewriting implementation. After fixes, review again and refresh
+   both affected tracks. Once review passes, rerun the complete acceptance entry
+   against the final candidate. Only with user commit authorization and passing
+   final review/acceptance, make small commits and report hashes, key changes,
+   evidence and remaining limits. Explicit user authorization is separately
+   required for push.
 
 Shared workspaces need one writer per code area. Cross-repository work needs
 explicit file/repository ownership and coordinated final integration acceptance.
@@ -86,27 +88,42 @@ logs and run metadata in a task-specific local evidence directory outside the
 reviewed repositories, not in shared role/configuration files or committed history.
 A workspace-local `.orrery/reviews/` directory is one possible location.
 
-## Reviewer self-scan and source reconciliation
+## Reviewer source and scan tracks
 
-Before reviewing the candidate, resolve the configured Scryer executable and
-installed engine inventory/capabilities. Record CLI path/version when available
-(or executable hash), engine versions, package/library identities and hashes,
-provider/run identity if used, and whether facts came from installed releases or
-candidate-built packages. A scan of a scanner is supporting evidence, never a
-correctness certificate for that scanner.
+Use two independent evidence tracks bound to the same candidate. Neither an
+AI/source inventory nor scanner output is presumed correct. Self-scanning is
+supporting evidence, not a correctness certificate for the scanner or its code.
 
-Use automatic project language detection: the engine's target language is not
-necessarily the implementation language of its own repository. Discover the full
-relevant advertised scan-fact set from the actual participating capabilities,
-including dependencies, architecture, files, call graphs and communication where
-supported. Do not permanently restrict review to a small fixed fact whitelist or
-force the repository's engine ID as its implementation language. Preserve scope
-include/exclude policy and per-engine/per-fact outcomes. Do not install, upgrade
-or rebuild tools implicitly to make a scan pass.
+1. **Source track**: Read the actual diff, relevant source, contracts and tests.
+   Record a code-derived factual inventory, review findings, checked scope and
+   supporting source references. Include definitions, component/file ownership,
+   imports/references, calls, relationships, source positions and classifications.
+   When the tracks run sequentially, record this inventory and findings before
+   viewing this candidate's scan output. The scanner must never supply the sole
+   inspection checklist or determine the initial source-review scope.
+2. **Scan track**: Resolve the configured Scryer executable and installed engine
+   inventory/capabilities. Automatically detect implementation languages: an
+   engine repository's target language is not necessarily its own implementation
+   language. Collect the full relevant advertised fact set, including dependencies,
+   architecture, files, call graphs and communication where supported. Do not
+   force the repository's engine ID or a permanently fixed small fact whitelist.
+   Retain original JSON, stderr, exit status, command/mode, candidate identity,
+   scope/include/exclude policy, per-engine/per-fact outcomes and scan/run identity.
+   Record CLI path/version when available (or executable hash), engine versions,
+   package/library identities and hashes, provider provenance if used, and whether
+   collection uses installed releases or candidate-built packages.
 
-For a direct CLI scan, use the supported JSON stdout interface; for example,
-with runtime-resolved `REPO_ROOT`, `REVIEW_DIR` and capability-derived comma-separated
-`FACTS` (not literal placeholders):
+Safe parallel tracks are optional; independence is required. If sequential,
+source observations come first. Parallelism must not mix outputs between tracks
+before their inventories are recorded or conflict with clean/build/package paths
+or installation homes. Do not install, upgrade or rebuild tools implicitly to make
+a scan pass. Semantic resolution is appropriate when applicable, available and
+within scope; record its prerequisites and static/semantic modes separately.
+A static scan is not compiler or runtime binding.
+
+For direct collection, use runtime-resolved `REPO_ROOT`, `REVIEW_DIR` and
+capability-derived comma-separated `FACTS`, retaining evidence outside the
+reviewed repositories. For example:
 
 ```sh
 scryer engine list --json > "$REVIEW_DIR/engines.json"
@@ -114,38 +131,61 @@ scryer project scan "$REPO_ROOT" --facts "$FACTS" --json --compact \
   > "$REVIEW_DIR/facts.json" 2> "$REVIEW_DIR/scan.stderr"
 ```
 
-Record the exit status even when nonzero. Retain original stdout JSON, stderr,
-exact command/mode, candidate identity, scanner inputs/provenance and any run ID.
-A configured provider workflow is also valid if it retains the same raw facts
-and provenance; an architecture-only projection is insufficient. Do not use
-`-o report.json`. Use semantic resolution when applicable, available and within
-scope; record toolchain/build prerequisites and static/semantic modes separately.
-Do not overlap scanning with clean/build steps. A static scan must not be
-represented as compiler or runtime binding.
+Record the exit status even when nonzero. A configured provider workflow is also
+valid if it preserves the same raw facts and provenance; an architecture-only
+projection is insufficient. Do not use `-o report.json` or silently substitute old
+facts. TOML/Markdown workflow semantics, native/cgo and unsupported languages may
+not be modeled; their absent facts do not establish absent behavior.
 
-Compare facts with real source in the checked scope: definitions, component/file
-ownership, imports/references, calls, relationships, source locations and
-classifications. Always read source and tests directly, including paths missing
-from or unresolved by the scan. TOML/Markdown workflow semantics, native/cgo and
-unsupported languages may not be modeled by installed engines; inspect them
-rather than treating absent facts as absence of behavior.
+### Factual reconciliation
 
-Report these separately:
+Compare factual inventories, not correctness verdicts. Verify discrepancies
+against actual source, tests and applicable contracts, correcting whichever
+observation is wrong. Keep the distinction between source candidates, compiler
+bindings and runtime observations throughout reconciliation.
 
-- Confirmed scanner omissions/false positives, with fact identifiers, source
-  paths/positions and code evidence. Continue source review despite scanner errors.
-- If no discrepancy is found, explicitly say **“在本次已核对范围内一致”** and list the
-  checked scope. Never claim unverified whole-repository agreement.
-- Unsupported, uncollected, partial, fallback, unresolved and failed collection.
-  These are evidence limits, not automatically confirmed scanner bugs. If a scan
-  fails, continue source review and report scan-to-source verification incomplete;
-  never silently substitute old facts or claim agreement from failed checks.
-- Independent correctness/contract/regression findings and final acceptance
-  evidence. Matching facts do not replace source/test review.
+| Comparison | Required action |
+| --- | --- |
+| Both tracks agree | Record agreement within the checked scope, then continue normal source/requirements and test review. Matching inventories can share omissions. |
+| Source-only fact | Verify the source observation and requested contract. Report a confirmed scan omission only when real code evidence establishes that the fact should have been collected. Otherwise correct the mistaken AI judgment, record a coverage limit, or leave it unconfirmed. |
+| Scan-only fact | Verify it in code and tests. If correct, add it to the source-review scope and review the related paths; if disproved, report a confirmed scan false positive. Insufficient evidence remains unconfirmed. |
+| Ownership, target, direction, classification or position differs | Trace code and contract evidence, correct the wrong side and retain the evidence explaining the discrepancy. Neither track wins by default. |
+| Evidence is insufficient | Retain an unconfirmed item and its reason; do not force agreement or label an unknown as a confirmed scanner error. |
 
-After fixes, refresh affected facts for the final candidate. Impact analysis is
-not an additional reviewer duty yet. This does not waive impact regression steps
-already included in an established complete acceptance plan.
+Inspect actual code and tests in every branch, including relevant paths missing
+from or unresolved by the scan. Iterate the expanded review scope and
+reconciliation until differences are explained or explicitly unknown. Never
+invent an edge or turn a scanner defect into an application defect. On scan
+failure, continue source review and state that scan-to-source verification is
+incomplete; failure cannot establish agreement.
+
+Retain the checked scope, source references, matched observations and discrepancy
+log with fact identifiers where available. Keep five report buckets separate:
+
+- **Code findings**: independent requirement, contract, responsibility and
+  regression findings from direct source/test review.
+- **Confirmed scanner omissions/false positives**: source-backed differences
+  under the requested contract, not merely missing or unresolved facts.
+- **Corrected AI judgments**: mistaken source observations corrected using real
+  code and contract evidence.
+- **Unconfirmed items and coverage limits**: unsupported, uncollected, partial,
+  fallback, unresolved, failed scans and other insufficient evidence, with reasons.
+- **Final candidate acceptance**: exact candidate identity, final review scope and
+  validation/plan outcomes, independently of scanner accuracy.
+
+If no discrepancy is found, say **“在已核对范围内一致”** and list that scope; do not
+claim whole-repository correctness. Agreement can hide shared omissions.
+Confidence comes from verified scope and repeatable regression evidence, not
+repeated matching verdicts. Confirmed scanner or projection defects whose fixes
+are authorized and in scope require a minimal reproducible example and meaningful
+regression coverage. Report out-of-scope or cross-repository follow-ups without
+silently expanding implementation ownership.
+
+After fixes, refresh both affected source and scan tracks against the final
+candidate and reconcile again. Preserve raw facts and provenance for handoff.
+Impact analysis is not an additional reviewer duty yet. This does not waive
+impact regression steps already included in an established complete acceptance
+plan.
 
 ## Running acceptance plans
 
