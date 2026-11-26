@@ -419,17 +419,26 @@ are independent of Core's Markdown/HTML report resources.
 
 ## Next priorities
 
-The source slice now includes header provider candidates, macro callable scopes,
-indirect callback candidates and POSIX/loader evidence. Continue macOS work with:
+The CMake and header-provider baseline is already shipped in v0.4.0: targets and
+aliases, bounded variable/list and directory/include scopes, explicit source
+memberships, transitive include contexts, and evidence-based header provider
+candidates. Macro callable scopes, indirect callback candidates and POSIX/loader
+evidence are also present. `componentIds` is declared membership; include exposure
+and provider candidates do not establish ownership. See [fact extensions](docs/FACTS.md).
 
-1. Continue CMake target/source completeness beyond the delivered normal-variable,
-   directory/include-scope and auxiliary-source slice. Drive glob, generator-expression
-   and custom-factory support from concrete evidence; retain unknown configuration
-   inputs and keep build collection independent from C/C++ parsing.
-2. Verify large real repositories with explicit include/exclude scope. Measure
-   time, memory and output size, and inspect missing/false target memberships,
-   include links and cross-file calls. A completed JSON export is not proof of
-   complete architecture extraction.
+Continue macOS work in this order; the product roadmap remains in Core's
+[milestones](https://github.com/scryer-labs/scryer/blob/main/docs/MILESTONES.md):
+
+1. Verify large real repositories with explicit include/exclude scope. Measure
+   time, memory and output size, and compare source with target memberships,
+   include links and cross-file calls. Record unknowns separately from confirmed
+   omissions/false links. A completed JSON export is not proof of completeness.
+2. Turn confirmed gaps into minimal fixtures and focused fixes. Remaining static
+   CMake boundaries include GLOB/GLOB_RECURSE, general generator expressions,
+   file sets and custom factories. Type-only/template/generated headers can still
+   lack provider evidence. Select enhancements from actual failures rather than
+   treating CMake or header ownership as unimplemented. Preserve ambiguity and
+   keep build collection independent from C/C++ parsing.
 3. Improve per-file/translation-unit completeness evidence and partial-result
    diagnostics. Missing compilation commands or failed units must remain visible
    instead of implying that missing relations do not exist. Strengthen typedef,
