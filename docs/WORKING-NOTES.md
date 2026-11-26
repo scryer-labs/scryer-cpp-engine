@@ -131,41 +131,100 @@ supporting evidence, not a correctness certificate for the scanner or its code.
    When the tracks run sequentially, record this inventory and findings before
    viewing this candidate's scan output. The scanner must never supply the sole
    inspection checklist or determine the initial source-review scope.
-2. **Scan track**: Resolve the configured Scryer executable and installed engine
-   inventory/capabilities. Automatically detect implementation languages: an
-   engine repository's target language is not necessarily its own implementation
-   language. Collect the full relevant advertised fact set, including dependencies,
-   architecture, files, call graphs and communication where supported. Do not
-   force the repository's engine ID or a permanently fixed small fact whitelist.
-   Retain original JSON, stderr, exit status, command/mode, candidate identity,
-   scope/include/exclude policy, per-engine/per-fact outcomes and scan/run identity.
-   Record CLI path/version when available (or executable hash), engine versions,
-   package/library identities and hashes, provider provenance if used, and whether
-   collection uses installed releases or candidate-built packages.
+2. **Scan track**: Obtain the current registered project's facts through Orrery's
+   normal project Scan API and effective managed workflow, never by executing the
+   Scryer CLI directly. Discover relevant installed engine capabilities from
+   recorded provider/engine metadata or package manifests; automatically detected
+   implementation languages, not the repository's engine name, determine the
+   applicable facts. Request the complete relevant supported fact set, including
+   dependencies, architecture, files, call graphs and communication as applicable.
+   Do not freeze review to a small fact whitelist or assume every engine supports
+   every requested fact. Retain the published raw facts and provenance below.
 
 Safe parallel tracks are optional; independence is required. If sequential,
-source observations come first. Parallelism must not mix outputs between tracks
-before their inventories are recorded or conflict with clean/build/package paths
-or installation homes. Do not install, upgrade or rebuild tools implicitly to make
-a scan pass. Semantic resolution is appropriate when applicable, available and
-within scope; record its prerequisites and static/semantic modes separately.
-A static scan is not compiler or runtime binding.
+record source observations before viewing this candidate's scan output. Do not
+mix outputs before the independent inventories are recorded. Scans must not
+conflict with acceptance tasks cleaning/rebuilding the same build/package paths
+or installation homes. Do not install tools or restart user services implicitly.
 
-For direct collection, use runtime-resolved `REPO_ROOT`, `REVIEW_DIR` and
-capability-derived comma-separated `FACTS`, retaining evidence outside the
-reviewed repositories. For example:
+### Registration and effective scanning configuration
 
-```sh
-scryer engine list --json > "$REVIEW_DIR/engines.json"
-scryer project scan "$REPO_ROOT" --facts "$FACTS" --json --compact \
-  > "$REVIEW_DIR/facts.json" 2> "$REVIEW_DIR/scan.stderr"
+Resolve the current workspace root from workspace registration or explicit
+configuration. Match the reviewed repository's actual path to its registered
+project and discover that project's `projectId`; do not copy Orrery's own project
+UUID or guess from a repository name. Keep machine roots and UUIDs out of these
+shared instructions. Use the configured Orrery API origin, not a fixed host.
+
+Inspect the effective project configuration through
+`GET /api/scanning/local?root=<url-encoded-workspace-root>&kind=project&projectId=<registered-project-id>`.
+Preserve the returned local/effective definitions, configuration source and
+revision before any change. Precedence is project override, workspace project
+default, then user default; a selected definition replaces the inherited one.
+Check actual YAML/provider bindings, not only effective control labels.
+
+If a correction is necessary, report it to the primary and keep it within the
+authorized project scope. Actual workflow changes affect execution and take the
+full validation path. Use `PUT /api/scanning/local` with the same `root`,
+`kind=project` and `projectId` query, and body `yaml`, `fact`, `currentRevisionId`.
+For an existing local override, use its captured local revision; when creating
+one with no local override, use null, not the inherited effective revision.
+Retain before/after snapshots, reread the effective selection and verify the
+saved result. On a revision conflict, reload and reconcile; never force a stale
+snapshot over concurrent changes. Do not edit scanning files directly or change
+workspace defaults, other projects or global configuration as a shortcut.
+
+The workflow must request full relevant supported facts, declare a `mode`
+parameter whose normal default may remain `static`, and bind that parameter to
+the selected provider scan operation (`mode: {parameter: mode}`). Merely declaring
+it is insufficient. Preserve `--compact` in the resolved provider. The workflow's
+`fact` identifies the exact retained JSON output reference, not a hand-built
+report filename. See Orrery's
+[managed scanning contract](https://github.com/scryer-labs/orrery/blob/main/docs/SCANNING-PLANS.md)
+and [scan publication API](https://github.com/scryer-labs/orrery/blob/main/docs/WORKSPACE-PROJECT-API.md).
+
+### Required scan entry point and publication evidence
+
+For full-workflow review, request this registered project through the normal API:
+
+```http
+POST /api/workspace/projects/{registeredProjectId}/scan
+Content-Type: application/json
+
+{"root":"<registered workspace root>","mode":"full","remoteList":false}
 ```
 
-Record the exit status even when nonzero. A configured provider workflow is also
-valid if it preserves the same raw facts and provenance; an architecture-only
-projection is insufficient. Do not use `-o report.json` or silently substitute old
-facts. TOML/Markdown workflow semantics, native/cgo and unsupported languages may
-not be modeled; their absent facts do not establish absent behavior.
+The reviewer explicitly requests `full`; ordinary UI scans may still default to
+static. Do not invoke Scryer CLI commands directly as another scan path, manually
+merge/construct a replacement facts document, or run only a Settings/plan-run
+workflow and treat its success as published facts. The normal scan endpoint owns
+execution, publication and history. No CLI fallback is allowed.
+
+Require successful publication for this exact attempt, not just a successful
+command or plan. Retain its returned scan ID, successful manifest, published
+facts and original provider JSON (`source/facts.json` where retained), logs and
+`plan-run.json`. Use that provenance to retain the configuration source/revision,
+frozen definition and parameters, provider operation/version/behavior, plan-run
+identity, executable/engine/package sources and versions or hashes, scope,
+requested facts and actual per-engine outcomes. Preserve original raw JSON;
+an architecture projection alone or a reconstructed aggregate is insufficient.
+Do not select an older `latestSuccessful` or unrelated latest log silently when
+the current attempt failed or another scan intervened.
+
+Inspect actual frozen `mode` bindings, remote-list value and resolved provider
+command/behavior to establish that `full` selected `--resolve` while preserving
+`--compact`. The API response saying `mode=full` alone does not prove this. A full
+request is not proof of complete semantic resolution: retain unsupported,
+uncollected, partial, fallback, unresolved and parser/compiler diagnostics, and
+distinguish source candidates, compiler evidence and runtime observations.
+
+If service, registration, configuration, execution or publication fails, preserve
+the concrete failure, mark scan verification incomplete and continue direct
+source/test review. Do not restart user services, expand permissions, bypass the
+API with CLI or another plan invocation, fabricate facts or silently reuse old
+scans. After implementation fixes, refresh the corresponding successful published
+scan and affected source inventory for the same final candidate. Keep local scan
+configuration, UUIDs, machine paths and run artifacts in local evidence outside
+source repositories; do not commit them as portable role defaults.
 
 ### Factual reconciliation
 

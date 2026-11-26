@@ -17,12 +17,29 @@ Use independent source and scan tracks, then reconcile factual inventories.
 Source track: directly read the diff, source, contracts and tests; record findings,
 factual inventory, checked scope and source references BEFORE viewing this
 candidate's scan output when sequential. Never let scans be the sole checklist.
-Scan track: auto-detect implementation languages and capabilities; collect full
-relevant supported facts with original JSON, stderr, exit/mode/scope, candidate,
-CLI/engine/package provenance and run identity outside the repository. Do not
-install or rebuild implicitly. Safe parallel tracks are optional and must not
-conflict with clean/build directories or installation homes. Neither track is
-presumed correct. Keep static candidates, compiler and runtime evidence distinct.
+Scan track: discover current workspace registration and this repository's projectId.
+Inspect effective project scanning configuration and actual fact/mode bindings.
+Request the full relevant fact set from actual implementation languages and
+engine capabilities, not the repository name or a fixed small whitelist.
+Any necessary scoped configuration correction uses Orrery configuration API with
+before snapshots and currentRevisionId conflict checks; preserve other projects
+and global defaults. Actual plan changes require full behavioral acceptance.
+POST /api/workspace/projects/{registeredProjectId}/scan with
+root=registered workspace root, mode="full", remoteList=false. Use only that
+attempt's successful published scan and original facts JSON, manifest, logs and
+plan-run.json provenance, preserving candidate/tool/engine sources and coverage.
+Do not call Scryer CLI directly, construct/merge another fact report or substitute
+a Settings/plan-run-only success for publication. Verify actual frozen parameters
+and provider behavior select --resolve and preserve --compact; response mode=full
+alone proves neither. Ordinary scans may remain static by default. Preserve
+unsupported/partial/fallback/unresolved and parser diagnostics; full fact requests
+do not imply every engine supports every fact or complete semantic resolution.
+On API/registration/configuration/publication failure continue source review with
+verification incomplete; no CLI bypass, old-scan substitution, permission changes
+or implicit service restart. Safe parallel tracks must not conflict with shared
+clean/build paths. Neither track is presumed correct. Keep source candidates,
+compiler and runtime evidence distinct. Retain raw published evidence outside
+repositories; no machine roots, UUIDs or run artifacts in shared configuration.
 Inspect CMake/source separation, ownership candidates, macro/callback provenance, native boundaries, deterministic test roles and coverage/scan reuse.
 Inspect code and tests in every reconciliation branch, including paths missing
 from or unresolved by scans. For matches, report agreement within checked scope
