@@ -160,7 +160,13 @@ outside this static resolution.
 `call-graph` returns syntactic function definitions, lambdas and call sites with
 project-relative paths and one-based line/byte-column ranges (end exclusive).
 Calls include the enclosing symbol when one is visible. A unique exact spelling
-in the scanned definitions can appear as a candidate.
+in the scanned definitions can appear as a candidate. For bare calls in lowercase
+`.c` files, a unique same-file literal `static` free function can take precedence
+with `candidateBasis: "file-internal-definition"`. This remains source evidence,
+not a compiler-language or lookup guarantee. Known local/parameter bindings,
+macros, conditional/duplicate definitions, additional declarations and visible
+C++ constructs block this refinement. C++ overload lookup and header static-inline
+candidates retain their existing boundaries. See [fact extensions](docs/FACTS.md).
 The symbol table also preserves initialized variable templates as declaration
 nodes and marks explicit `consteval` functions with `executionKind: "compile-time"`.
 Semantic declaration/type references are retained in `semantic.references[]`,

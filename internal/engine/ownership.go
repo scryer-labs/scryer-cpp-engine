@@ -46,8 +46,7 @@ func observeAPI(node *sitter.Node, file string, source []byte) (apiDeclaration, 
 			return apiDeclaration{}, false
 		}
 	}
-	text := node.Utf8Text(source)
-	if strings.HasPrefix(strings.TrimSpace(text), "static ") {
+	if staticFreeFunction(node, source) {
 		return apiDeclaration{}, false
 	}
 	declarator := node.ChildByFieldName("declarator")

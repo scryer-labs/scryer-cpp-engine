@@ -33,6 +33,31 @@ Consumers should display declared, candidate and unknown ownership separately.
 Do not reject a clean layering view on the basis of candidate-only ownership or
 substitute the nearest CMakeLists directory as confirmed ownership.
 
+## File-internal C function candidates
+
+Bare calls in lowercase `.c` files can prefer one same-file free-function
+implementation with an explicit AST `static` storage specifier. Storage order,
+comments and newlines do not change classification. The existing optional
+`candidateBasis` is `file-internal-definition`, with `resolution: name-candidate`;
+this never supplies a compiler `targetSymbolId` or proves runtime invocation.
+No ABI or report schema version changes are required.
+
+This refinement is blocked by duplicate/conditional or malformed definitions,
+known parameter/local-name shadowing, and selected-source macro definitions of
+the callee (including empty replacements). Boundary resolutions include
+`ambiguous-name`, `conditional-definition`, `unresolved-definition`,
+`local-binding-boundary` and `macro-name-boundary`. Local binding collection is
+conservative across the entire enclosing function, not full block/order lookup.
+Macro observation does not execute preprocessing or interpret `#undef`/conditions.
+
+A `.c` filename does not establish the configured compiler language. Visible C++
+constructs and additional same-file declarations disable the refinement; `.C`
+and C++ extensions do not use it. This is not overload resolution or complete
+translation-unit visibility. Other-file static-inline header candidates and
+ordinary external-name candidates are retained. Class-static methods are not
+classified as file-internal free functions. Ownership collection uses the same
+literal storage classifier to exclude static helpers regardless of modifier order.
+
 ## Macro callable source scopes and completeness
 
 `call-graph.symbols[]` may contain `kind: "macro-body"` and

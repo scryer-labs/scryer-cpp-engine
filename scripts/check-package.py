@@ -67,3 +67,29 @@ with tempfile.TemporaryDirectory() as directory:
         assert left["key"] == right["key"] and left["fingerprint"] != right["fingerprint"]
     finally:
         library.release_buffer_v1(result.response)
+
+
+# Explicit C file-local helpers remain source candidates across native ABI builds.
+with tempfile.TemporaryDirectory(prefix="scryer source space ") as directory:
+    root = Path(directory).resolve() / "unicode-Ω"
+    root.mkdir()
+    source = "inline /* trivia */\r\nstatic int helper(void){return 1;}\r\nint wrapper(void){return helper();}\r\n"
+    for file in ("a.c", "b.c"):
+        (root / file).write_bytes(source.encode("utf-8"))
+    request = json.dumps({
+        "protocolVersion": 1, "requestId": "file-static-package-check", "stack": "cpp",
+        "operation": "scan", "scan": {"repository": str(root), "facts": ["call-graph"], "static": True},
+    }).encode()
+    result = library.execute_v1(View(request, len(request)))
+    try:
+        response = json.loads(ctypes.string_at(result.response.data, result.response.size))
+        assert result.status == 0 and response["error"] is None, response
+        graph = response["report"]["facts"]["call-graph"]
+        symbols = {symbol["symbolId"]: symbol for symbol in graph["symbols"]}
+        assert len(graph["calls"]) == 2, graph
+        for call in graph["calls"]:
+            assert call["candidateBasis"] == "file-internal-definition", call
+            assert call["resolution"] == "name-candidate", call
+            assert symbols[call["candidateSymbolId"]]["definition"]["file"] == call["site"]["file"], call
+    finally:
+        library.release_buffer_v1(result.response)
