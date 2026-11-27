@@ -68,6 +68,16 @@ questions, ownership assignments and the final report. It coordinates the roles
 below in order. These instructions are an orchestration convention, not an
 automatically enforced pipeline. Do not parallelize dependent phases.
 
+Start each role with a short handoff. Use a fresh agent without the full chat
+history when the client supports it. Give it the current requirement and
+constraints, its role and ownership, the candidate identity, the relevant source
+and contract paths, the acceptance entries, and the findings or failures to
+resolve. Link to retained evidence and include exact run IDs. Quote only the
+relevant log lines. Let the agent read the diff, code and full records as needed.
+Resume the same agent after an interruption when possible. If it needs replacing,
+pass the last frozen candidate and pending checks rather than replaying the chat.
+Reviewers still form their own source inventory and verify the acceptance evidence.
+
 1. **Analysis** reads the latest conversation, source, Git state and applicable
    contracts. Stay read-only: do not modify implementation or commit. Hand off the
    problem, scope, constraints, affected repositories/boundaries, acceptance
