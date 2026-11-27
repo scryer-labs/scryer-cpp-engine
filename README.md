@@ -422,6 +422,12 @@ are independent of Core's Markdown/HTML report resources.
   resource names can remain unresolved; Unix stream pairing and arbitrary IPC
   APIs or REST/RPC/GraphQL are not implemented. Loader lookup/preload declarations
   are evidence, not proven runtime replacement.
+- Large static scans consume substantial memory when collecting the call graph.
+  In two macOS arm64 CLI runs on a 457-file C/C++ project with v0.4.0, the full
+  selected fact set took 8.75–8.86 seconds, used 655–665 MiB peak RSS and wrote
+  24.68 MB of compact JSON. Omitting `call-graph` took 7.27–7.38 seconds, used
+  205–214 MiB and wrote 2.83 MB. These are whole-process measurements for one
+  project. Performance profiling and optimization are deferred.
 
 ## Next priorities
 
@@ -435,10 +441,10 @@ and provider candidates do not establish ownership. See [fact extensions](docs/F
 Continue macOS work in this order; the product roadmap remains in Core's
 [milestones](https://github.com/scryer-labs/scryer/blob/main/docs/MILESTONES.md):
 
-1. Verify large real repositories with explicit include/exclude scope. Measure
-   time, memory and output size, and compare source with target memberships,
-   include links and cross-file calls. Record unknowns separately from confirmed
-   omissions/false links. A completed JSON export is not proof of completeness.
+1. Extend the initial large-project static acceptance with a compiler-assisted
+   pass using a compilation database for the current checkout and build target.
+   Compare target memberships, includes and call bindings against source, and
+   record skipped or failed translation units alongside confirmed gaps.
 2. Turn confirmed gaps into minimal fixtures and focused fixes. Remaining static
    CMake boundaries include GLOB/GLOB_RECURSE, general generator expressions,
    file sets and custom factories. Type-only/template/generated headers can still

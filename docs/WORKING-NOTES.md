@@ -78,7 +78,7 @@ Resume the same agent after an interruption when possible. If it needs replacing
 pass the last frozen candidate and pending checks rather than replaying the chat.
 Reviewers still form their own source inventory and verify the acceptance evidence.
 
-1. **Analysis** reads the latest conversation, source, Git state and applicable
+1. **Analysis** reads the current handoff, source, Git state and applicable
    contracts. Stay read-only: do not modify implementation or commit. Hand off the
    problem, scope, constraints, affected repositories/boundaries, acceptance
    criteria, unresolved questions and an executable coding plan.
